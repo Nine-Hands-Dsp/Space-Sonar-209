@@ -6,7 +6,7 @@ if(APPLE)
   set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "" FORCE)
 endif()
 
-project(SpaceSonar209 VERSION 1.0.2)
+project(SpaceSonar209 VERSION 1.0.3)
 
 include(FetchContent)
 FetchContent_Declare(JUCE
@@ -20,9 +20,9 @@ juce_add_binary_data(SpaceSonarAssets SOURCES
   fonts/Poppins-Regular.ttf fonts/Poppins-Medium.ttf fonts/Poppins-Bold.ttf fonts/Poppins-Light.ttf
   assets/background.jpg
   assets/knob_chrome_shadow.png assets/knob_chrome_crown.png assets/knob_chrome_cap.png assets/knob_chrome_marker.png assets/knob_chrome_highlight.png
-  assets/knob_mode_crown.png assets/knob_mode_cap.png assets/knob_mode_marker.png assets/knob_mode_highlight.png
+  assets/knob_selector_marker.png
   assets/knob_black_shadow.png assets/knob_black_cap.png assets/knob_black_marker.png assets/knob_black_highlight.png
-  assets/toggle_strip.png assets/led_red_off.png assets/led_red_on.png assets/slide_knob.png)
+  assets/toggle_strip.png assets/led_red_off.png assets/led_red_on.png assets/slide_button.png)
 
 juce_add_plugin(SpaceSonar209
   VERSION ${PROJECT_VERSION}

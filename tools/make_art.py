@@ -209,30 +209,54 @@ T(200, 466, 'PEAK', 10, 'Medium', WHITE, 1.2); T(200, 479, 'LEVEL', 10, 'Medium'
 LK = [(190, 'MIC', 'VOLUME'), (345, 'FROM P.A.', 'VOLUME'), (500, 'INSTRUMENT', 'VOLUME')]
 for x, a1, a2 in LK:
     T(x, 540, a1, 11, 'Medium', WHITE, 1.1); T(x, 554, a2, 11, 'Medium', WHITE, 1.1)
-T(689, 402, 'MODE SELECTOR', 12.5, 'Bold', WHITE, 1.6)
-MX, MY, MR = 689, 528, 44
+T(689, 400, 'MODE SELECTOR', 13, 'Bold', WHITE, 1.8)
+MX, MY, MR = 689, 530, 56                    # potard (bague exterieure) : photo fournie, comme les autres potards
 MANG = [-150 + 30 * i for i in range(11)] + [180]
-# bande de graduation blanche (1 a 11), separations noires, ouverte en bas sur REVERB ONLY
-RB0, RB1 = 53.0, 70.0
+PALE = np.array([214, 222, 226], np.float32)
+# --- paves gris clair entre les numeros (anneau r 75..86)
+RB0, RB1, RN = 74.5, 86.5, 80.5
 dd = np.hypot(xx - U(MX), yy - U(MY))
 th = np.degrees(np.arctan2(xx - U(MX), -(yy - U(MY))))          # 0 = en haut, sens horaire
-band = np.clip(dd - U(RB0), 0, 1) * np.clip(U(RB1) - dd, 0, 1) * np.clip((165.0 - np.abs(th)) * U(RB1) * math.pi / 180.0, 0, 1)
-img = soft_shadow(img, band, 1.2, 1.2, 1.5, 0.45)
-shade = 226 + 16 * np.clip(1 - ((xx - U(MX - RB1)) + (yy - U(MY - RB1))) / U(4 * RB1), 0, 1)
-img = fill(img, band, shade[..., None] * np.array([1.0, 1.0, 0.975]))
+ringm = np.clip(dd - U(RB0), 0, 1) * np.clip(U(RB1) - dd, 0, 1)
+blocks = np.zeros_like(dd)
+for i in range(10):                                              # entre 1-2, 2-3, ... 10-11
+    c0 = MANG[i] + 15.0
+    half = 10.5 if i < 8 else 9.0                                # numeros 10 et 11 plus larges
+    dth = np.abs(((th - c0 + 180.0) % 360.0) - 180.0)
+    blocks = np.maximum(blocks, np.clip((half - dth) * U(RN) * math.pi / 180.0, 0, 1))
+blocks *= ringm
+img = soft_shadow(img, blocks, 0.8, 0.8, 1.0, 0.35)
+shade = 1.0 + 0.06 * np.clip(1 - ((xx - U(MX - RB1)) + (yy - U(MY - RB1))) / U(4 * RB1), 0, 1)
+img = fill(img, blocks, PALE * shade[..., None])
 L, td = line_layer()
-for kk in range(12):
-    a = math.radians(-165 + 30 * kk)
-    td.line([U(MX + RB0 * math.sin(a)), U(MY - RB0 * math.cos(a)), U(MX + RB1 * math.sin(a)), U(MY - RB1 * math.cos(a))], fill=(18, 20, 18, 255), width=int(U(1.6)))
-a = math.radians(180)
-td.line([U(MX + (RB0 + 2) * math.sin(a)), U(MY - (RB0 + 2) * math.cos(a)), U(MX + (RB1 - 1) * math.sin(a)), U(MY - (RB1 - 1) * math.cos(a))], fill=WHITE, width=int(U(2.2)))
+WL = (238, 240, 236, 255)
+def pol(r, a_deg): a_ = math.radians(a_deg); return (U(MX + r * math.sin(a_)), U(MY - r * math.cos(a_)))
+def seg(r0, r1, a_deg, w):
+    p0, p1 = pol(r0, a_deg), pol(r1, a_deg); td.line([p0[0], p0[1], p1[0], p1[1]], fill=WL, width=int(U(w)))
+def arcl(r, a0, a1, w):
+    n_ = max(2, int(abs(a1 - a0) / 1.5))
+    pts = []
+    for j in range(n_ + 1):
+        q = pol(r, a0 + (a1 - a0) * j / n_); pts += [q[0], q[1]]
+    td.line(pts, fill=WL, width=int(U(w)), joint='curve')
+# --- traits blancs entre le potard et les numeros, long trait vers REVERB ONLY
+for i in range(11):
+    seg(61.5, 70.0, MANG[i], 1.7)
+seg(61.5, 98.0, 180.0, 1.9)
+# --- accolades : REPEAT (1 a 4) et REVERB ECHO (5 a 11), coupees par leur texte, crochets aux bouts
+RA = 96.0
+arcl(RA, -160.0, -133.0, 1.3); arcl(RA, -86.0, -50.0, 1.3)
+seg(RA - 6.0, RA, -160.0, 1.3); seg(RA - 6.0, RA, -50.0, 1.3)
+arcl(RA, -40.0, 30.0, 1.3); arcl(RA, 92.0, 160.0, 1.3)
+seg(RA - 6.0, RA, -40.0, 1.3); seg(RA - 6.0, RA, 160.0, 1.3)
 img = comp(img, L)
+arc_text(MX, MY, RA, -109.5, 'REPEAT', 8.2, 'Bold', WHITE, 0.8)
+arc_text(MX, MY, RA, 61.0, 'REVERB ECHO', 8.2, 'Bold', WHITE, 0.8)
+# --- numeros blancs (graisses fortes), tournes le long du cercle
 for i in range(11):
     a = math.radians(MANG[i])
-    T(MX + 61.8 * math.sin(a), MY - 61.8 * math.cos(a), str(i + 1), 10.5, 'Bold', (16, 18, 16, 255), 0.0, 'mm', MANG[i])
-arc_text(MX, MY, 79.0, -105.0, 'REPEAT', 9.0, 'Medium', WHITE, 1.0)
-arc_text(MX, MY, 79.0, 72.0, 'REVERB ECHO', 9.0, 'Medium', WHITE, 1.0)
-T(MX, MY + 84, 'REVERB', 10, 'Medium', WHITE, 1.2); T(MX, MY + 97, 'ONLY', 10, 'Medium', WHITE, 1.2)
+    T(MX + RN * math.sin(a), MY - RN * math.cos(a), str(i + 1), 12.5, 'Bold', (246, 248, 244, 255), 0.0, 'mm', MANG[i])
+T(MX, MY + 109, 'REVERB', 10.5, 'Bold', WHITE, 1.2); T(MX, MY + 123, 'ONLY', 10.5, 'Bold', WHITE, 1.2)
 L, td = line_layer()
 RK = [(882, 478, 'BASS'), (1020, 478, 'TREBLE'), (1158, 478, 'REVERB VOLUME'), (882, 612, 'REPEAT RATE'), (1020, 612, 'INTENSITY'), (1158, 612, 'ECHO VOLUME')]
 for x, y, lab in RK:
@@ -255,10 +279,10 @@ img = comp(img, L)
 for x0, x1, lab in BOX:
     if lab in ('MIC', 'FROM P.A.'): T((x0 + x1) / 2, 712, lab, 10.5, 'Medium', BLACK, 1.1)
     else: T(x0 + 14, 712, lab, 10.5, 'Medium', BLACK, 1.1, 'lm')
-T(600, 764, 'ECHO', 8.5, 'Medium', BLACK, 0.8); T(672, 764, 'NORMAL', 8.5, 'Medium', BLACK, 0.8)
-T(774, 712, 'MIC', 10.5, 'Medium', BLACK, 0.8); T(821, 712, 'P.A.', 10.5, 'Medium', BLACK, 0.8); T(868, 712, 'INST', 10.5, 'Medium', BLACK, 0.8)
+T(616, 768, 'ECHO', 8.5, 'Medium', BLACK, 0.8); T(658, 768, 'NORMAL', 8.5, 'Medium', BLACK, 0.8)
+T(790.2, 718, 'MIC', 9.5, 'Medium', BLACK, 0.6); T(820.8, 718, 'P.A.', 9.5, 'Medium', BLACK, 0.6); T(851.4, 718, 'INST', 9.5, 'Medium', BLACK, 0.6)
 for i, s_ in enumerate('HML'):
-    T(1040 + i * 26, 730, s_, 9.5, 'Medium', BLACK)
+    T(1035.2 + i * 30.6, 728, s_, 9.5, 'Medium', BLACK)
 T(1380, 764, 'ON   ·   OFF', 8.5, 'Medium', BLACK, 0.8)
 
 
@@ -281,10 +305,13 @@ def jack(img, x, y):
 JACKS = [(198, 748), (353, 748), (478, 748), (1200, 748), (1296, 748)]
 for (x, y) in JACKS:
     img = jack(img, x, y)
-SLIDES = [(590, 684, 744), (764, 878, 744), (1028, 1104, 750)]
-for (x0, x1, y) in SLIDES:
-    img = fill(img, rrect_mask(x0, y - 4.5, x1, y + 4.5, 4.5), np.array([12, 12, 12]))
-
+# glissieres : bouton et cavite d'apres la photo fournie (tools/slide_photo.py) ; le bouton est pose par l'editeur
+SL_H = 26.0                                            # hauteur de la cavite (unites d'origine) = 214 px de la photo
+SL_SU = SL_H / 214.0
+for name, cx, cy in (('slide_cavity2.png', 637.0, 744.0), ('slide_cavity3.png', 821.0, 744.0), ('slide_cavity3.png', 1066.0, 750.0)):
+    cav = Image.open(os.path.join(OUT, name))
+    wv = cav.width * SL_SU
+    img = paste_photo(img, cav, (cx - wv / 2, cy - SL_H / 2, cx + wv / 2, cy + SL_H / 2), (1.0, 1.0, 1.5, 0.25))
 FAC = False
 xx, yy = xx_fin, yy_fin
 line_layer = _line_layer0
@@ -388,7 +415,7 @@ slot_c = cv2.warpAffine(slot, shiftM, (N, N))
 slot_rgb = cv2.warpAffine(np.dstack([kv] * 3).astype(np.float32), shiftM, (N, N))
 capz = (kr <= R_CAP).astype(np.float32); crownz = ((kr > R_CAP) & (kr <= R_RING)).astype(np.float32); ringz = ((kr > R_RING) & (kr <= 1.0)).astype(np.float32)
 # matiere sans la fente pour le profil radial
-kv_noslot = np.where(cv2.dilate((slot > 0.02).astype(np.uint8), np.ones((9, 9), np.uint8)) > 0, np.nan, kv)
+kv_noslot = np.where((np.abs(kx - (kc + SX)) < 0.075 * RPX) & (ky < kc - 0.08 * RPX) & (kr < R_CAP + 0.01), np.nan, kv)
 def radial_avg_nan(v, a):
     bins = np.clip((kr * 400).astype(int), 0, 799)
     ok = ~np.isnan(v)
@@ -399,13 +426,22 @@ save_layer('knob_chrome_shadow', *shadow_layer(ka))
 save_layer('knob_chrome_crown', kp[..., :3], ka * crownz)                    # couronne crantee : photo, tourne
 save_layer('knob_chrome_cap', np.dstack([basek] * 3), ka * (capz + ringz))   # matiere brossee invariante par rotation
 save_layer('knob_chrome_marker', slot_rgb, np.clip(slot_c, 0, 1))           # fente noire, pointee vers le haut
-slot_big = cv2.dilate((slot > 0.02).astype(np.uint8), np.ones((9, 9), np.uint8)).astype(bool)
-tgt = np.where(slot_big, basek, kv)
-hl_rgb, hl_a = highlight_from(tgt, basek, ka * (capz + ringz))
+tri = Image.new('L', (N, N), 0); dtri = ImageDraw.Draw(tri)
+dtri.polygon([(kc, kc - RPX * 0.965), (kc - RPX * 0.045, kc - RPX * 0.86), (kc + RPX * 0.045, kc - RPX * 0.86)], fill=255)
+tria = cv2.GaussianBlur(np.asarray(tri, np.float32) / 255.0, (0, 0), 1.0)
+mal = np.clip(slot_c + tria, 0, 1)
+save_layer('knob_selector_marker', (slot_rgb * slot_c[..., None] + 14.0 * tria[..., None]) / np.maximum(mal[..., None], 1e-4), mal)
+slot_big = (np.abs(kx - (kc + SX)) < 0.075 * RPX) & (ky < kc - 0.08 * RPX) & (kr < R_CAP + 0.01)
+tgt = cv2.inpaint(np.clip(kv, 0, 255).astype(np.uint8), slot_big.astype(np.uint8) * 255, 9, cv2.INPAINT_TELEA).astype(np.float32)   # reflets coniques continus sous la fente
+tgt = np.where(slot_big, tgt, kv)
+# sous la fente : interpolation ligne par ligne entre les bords gauche et droit (les reflets coniques varient doucement)
+for yrow in np.where(slot_big.any(1))[0]:
+    cols_ = np.where(slot_big[yrow])[0]
+    c0_, c1_ = cols_.min() - 2, cols_.max() + 2
+    if kr[yrow, c0_] > 0.25:
+        tgt[yrow, c0_:c1_ + 1] = np.linspace(kv[yrow, c0_], kv[yrow, c1_], c1_ - c0_ + 1)
+hl_rgb, hl_a = highlight_from(tgt, basek, ka * (capz * 0.72 + ringz))       # chapeau : reflets un peu adoucis (la fente reste sombre)
 save_layer('knob_chrome_highlight', hl_rgb, hl_a)
-# pour le selecteur de mode (inchange) : chrome du kit
-chrome = np.clip(62 + 1.75 * v, 0, 255)
-base = radial_avg(chrome, body)
 # --- noir (panneau etendu)
 baseb = radial_avg(v, body)
 save_layer('knob_black_shadow', *shadow_layer(a))
@@ -416,30 +452,6 @@ mm = cv2.GaussianBlur(np.asarray(m, np.float32) / 255.0, (0, 0), 1.0)
 save_layer('knob_black_marker', np.full((N, N, 3), 236.0), mm)
 hl_rgb, hl_a = highlight_from(v, baseb, body)
 save_layer('knob_black_highlight', hl_rgb, hl_a)
-# --- selecteur de mode : chapeau chrome (r <= 0,70) sur jupe noire molete
-RC = 0.70
-mapx = (kc + (kx - kc) * (1.0 / RC)).astype(np.float32); mapy = (kc + (ky - kc) * (1.0 / RC)).astype(np.float32)
-chrome_in = cv2.remap(chrome.astype(np.float32), mapx, mapy, cv2.INTER_LINEAR)
-base_in = cv2.remap(base.astype(np.float32), mapx, mapy, cv2.INTER_LINEAR)
-capz = (kr <= RC).astype(np.float32)
-skirtz = ((kr > RC) & (kr <= 1.0)).astype(np.float32)
-knurl2 = 0.5 + 0.5 * np.sign(np.sin(kth * 72))
-skirt = baseb * (0.80 + 0.30 * knurl2)                       # moletage de la jupe noire
-target = np.where(kr <= RC, chrome_in, v)
-basem = np.where(kr <= RC, base_in, skirt)
-lip = np.clip(1 - np.abs(kr - RC) / 0.025, 0, 1)            # liseré sombre entre chapeau et jupe
-save_layer('knob_mode_crown', np.dstack([skirt * (1 - 0.6 * lip)] * 3), a * skirtz)
-save_layer('knob_mode_cap', np.dstack([base_in * (1 - 0.5 * lip)] * 3) * np.array([0.98, 0.99, 1.0]), a * capz)
-m = Image.new('L', (N, N), 0); dm = ImageDraw.Draw(m)
-dm.line([kc, kc - RPX * 0.06, kc, kc - RPX * 0.64], fill=255, width=int(RPX * 0.07))
-mk = cv2.GaussianBlur(np.asarray(m, np.float32) / 255.0, (0, 0), 1.0)
-m = Image.new('L', (N, N), 0); dm = ImageDraw.Draw(m)
-dm.line([kc, kc - RPX * 0.76, kc, kc - RPX * 0.97], fill=255, width=int(RPX * 0.075))
-mw = cv2.GaussianBlur(np.asarray(m, np.float32) / 255.0, (0, 0), 1.0)
-mrgb = np.dstack([18 * mk + 238 * mw] * 3) / np.maximum(np.dstack([mk + mw] * 3), 1e-4)
-save_layer('knob_mode_marker', mrgb, np.clip(mk + mw, 0, 1))
-hl_rgb, hl_a = highlight_from(np.where(kr <= RC, chrome_in, skirt * (v / np.maximum(baseb, 1))), basem, body)
-save_layer('knob_mode_highlight', hl_rgb, hl_a)
 print('potards ok')
 
 # ====================================================================== inverseur, LED, glissiere (4 px par unite)
@@ -452,21 +464,6 @@ Image.fromarray(np.clip(off, 0, 255).astype(np.uint8), 'RGBA').save(os.path.join
 Image.fromarray(np.clip(on, 0, 255).astype(np.uint8), 'RGBA').save(os.path.join(OUT, 'led_red_on.png'))
 print('inverseur + LED ok, LED', side, 'unites')
 
-# bouton de glissiere : 22 x 20 unites, sprite 40 x 40 unites
-n = 40 * AS4
-sy, sx = np.mgrid[0:n, 0:n].astype(np.float32)
-def rr_(x0, y0, x1, y1, r):
-    x0, y0, x1, y1, r = [v * AS4 for v in (x0, y0, x1, y1, r)]
-    cx = np.clip(sx, x0 + r, x1 - r); cy = np.clip(sy, y0 + r, y1 - r)
-    return np.clip(0.5 - (np.hypot(sx - cx, sy - cy) - r), 0, 1)
-km = rr_(9, 10, 31, 30, 3)
-sh = cv2.GaussianBlur(np.roll(np.roll(km, int(2.5 * AS4), 0), int(2.5 * AS4), 1), (0, 0), 2.5 * AS4) * 0.55
-g = 52 + 40 * np.clip(1 - ((sx - 9 * AS4) + (sy - 10 * AS4)) / (42 * AS4), 0, 1)
-ridges = 0.5 + 0.5 * np.sin((sx - 20 * AS4) / (2.0 * AS4) * math.pi)
-colk = g * (0.85 + 0.15 * ridges)
-alpha = np.clip(km + sh * (1 - km), 0, 1)
-colv = np.where(alpha > 1e-4, colk * km / np.maximum(alpha, 1e-4), 0)
-Image.fromarray(np.dstack([np.clip(np.dstack([colv] * 3), 0, 255), alpha * 255]).astype(np.uint8), 'RGBA').save(os.path.join(OUT, 'slide_knob.png'))
 print('glissiere ok')
 
 # ====================================================================== Layout.h

@@ -10,9 +10,9 @@ juce_add_binary_data(SpaceSonarAssets SOURCES ${W}/logo/NineHandsLogoBlack.svg
   ${W}/fonts/Poppins-Regular.ttf ${W}/fonts/Poppins-Medium.ttf ${W}/fonts/Poppins-Bold.ttf ${W}/fonts/Poppins-Light.ttf
   ${W}/assets/background.jpg
   ${W}/assets/knob_chrome_shadow.png ${W}/assets/knob_chrome_crown.png ${W}/assets/knob_chrome_cap.png ${W}/assets/knob_chrome_marker.png ${W}/assets/knob_chrome_highlight.png
-  ${W}/assets/knob_mode_crown.png ${W}/assets/knob_mode_cap.png ${W}/assets/knob_mode_marker.png ${W}/assets/knob_mode_highlight.png
+  ${W}/assets/knob_selector_marker.png
   ${W}/assets/knob_black_shadow.png ${W}/assets/knob_black_cap.png ${W}/assets/knob_black_marker.png ${W}/assets/knob_black_highlight.png
-  ${W}/assets/toggle_strip.png ${W}/assets/led_red_off.png ${W}/assets/led_red_on.png ${W}/assets/slide_knob.png)
+  ${W}/assets/toggle_strip.png ${W}/assets/led_red_off.png ${W}/assets/led_red_on.png ${W}/assets/slide_button.png)
 juce_add_console_app(SpaceSonarRender PRODUCT_NAME "SpaceSonarRender")
 target_sources(SpaceSonarRender PRIVATE main.cpp ${W}/PluginProcessor.cpp ${W}/PluginEditor.cpp ${W}/WindowMinSize.cpp)
 target_include_directories(SpaceSonarRender PRIVATE ${W})

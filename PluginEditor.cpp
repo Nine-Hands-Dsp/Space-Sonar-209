@@ -82,7 +82,9 @@ void Slide::paint (Graphics& g)
 {
     const float s = ed.k() * ssl::kFS;
     const float x = xs[(size_t) position()];
-    const auto r = Rectangle<float> (40 * s, 40 * s).withCentre ({ (x - xs.front() + 22) * s, 22 * s });
+    // bouton de la photo : 261 x 214 px pour une cavité de 26 unités de haut, centre du bouton à 133,5 px du bord gauche
+    constexpr float su = 26.0f / 214.0f;
+    const auto r = Rectangle<float> ((x - xs.front() + 22 - 133.5f * su) * s, (22 - 13) * s, 261.0f * su * s, 26 * s);
     g.setImageResamplingQuality (Graphics::highResamplingQuality);
     g.drawImage (knob, r);
 }
@@ -118,11 +120,8 @@ SpaceSonarEditor::SpaceSonarEditor (SpaceSonarProcessor& p)
                               png (BinaryData::knob_chrome_cap_png, BinaryData::knob_chrome_cap_pngSize), {},
                               png (BinaryData::knob_chrome_marker_png, BinaryData::knob_chrome_marker_pngSize),
                               png (BinaryData::knob_chrome_highlight_png, BinaryData::knob_chrome_highlight_pngSize) };
-    nh::Knob::Layers modeL { chrome.shadow,
-                             png (BinaryData::knob_mode_crown_png, BinaryData::knob_mode_crown_pngSize),
-                             png (BinaryData::knob_mode_cap_png, BinaryData::knob_mode_cap_pngSize), {},
-                             png (BinaryData::knob_mode_marker_png, BinaryData::knob_mode_marker_pngSize),
-                             png (BinaryData::knob_mode_highlight_png, BinaryData::knob_mode_highlight_pngSize) };
+    nh::Knob::Layers modeL = chrome;                    // sélecteur : même potard (photo), fente + triangle pointeur
+    modeL.marker = png (BinaryData::knob_selector_marker_png, BinaryData::knob_selector_marker_pngSize);
     nh::Knob::Layers black { png (BinaryData::knob_black_shadow_png, BinaryData::knob_black_shadow_pngSize), {},
                              png (BinaryData::knob_black_cap_png, BinaryData::knob_black_cap_pngSize), {},
                              png (BinaryData::knob_black_marker_png, BinaryData::knob_black_marker_pngSize),
@@ -130,7 +129,7 @@ SpaceSonarEditor::SpaceSonarEditor (SpaceSonarProcessor& p)
 
     knobPos = {
         { "micVol", 190, 619, 34, false }, { "paVol", 345, 619, 34, false }, { "instVol", 500, 619, 34, false },
-        { "mode", 689, 528, 44, false },
+        { "mode", 689, 530, 56, false },
         { "bass", 882, 478, 33, false }, { "treble", 1020, 478, 33, false }, { "reverbVol", 1158, 478, 33, false },
         { "repeatRate", 882, 612, 33, false }, { "intensity", 1020, 612, 33, false }, { "echoVol", 1158, 612, 33, false },
         { "speed", 1120, 1170, 24, true }, { "lfoRate", 1310, 1170, 24, true }, { "lfoShape", 1410, 1170, 24, true }, { "lfoDepth", 1510, 1170, 24, true },
@@ -155,10 +154,10 @@ SpaceSonarEditor::SpaceSonarEditor (SpaceSonarProcessor& p)
 
     power = std::make_unique<Toggle> (*this, *proc.apvts.getParameter ("power"), png (BinaryData::toggle_strip_png, BinaryData::toggle_strip_pngSize));
     addAndMakeVisible (*power);
-    const auto sk = png (BinaryData::slide_knob_png, BinaryData::slide_knob_pngSize);
-    slideEcho  = std::make_unique<Slide> (*this, *proc.apvts.getParameter ("echoOn"), sk, std::vector<float> { 604, 670 }, std::vector<float> { 1, 0 }, 744.0f);
-    slideInput = std::make_unique<Slide> (*this, *proc.apvts.getParameter ("inputSel"), sk, std::vector<float> { 776, 821, 866 }, std::vector<float> { 0, 1, 2 }, 744.0f);
-    slideOut   = std::make_unique<Slide> (*this, *proc.apvts.getParameter ("outLevel"), sk, std::vector<float> { 1040, 1066, 1092 }, std::vector<float> { 0, 1, 2 }, 750.0f);
+    const auto sk = png (BinaryData::slide_button_png, BinaryData::slide_button_pngSize);
+    slideEcho  = std::make_unique<Slide> (*this, *proc.apvts.getParameter ("echoOn"), sk, std::vector<float> { 621.5f, 652.1f }, std::vector<float> { 1, 0 }, 744.0f);
+    slideInput = std::make_unique<Slide> (*this, *proc.apvts.getParameter ("inputSel"), sk, std::vector<float> { 790.2f, 820.8f, 851.4f }, std::vector<float> { 0, 1, 2 }, 744.0f);
+    slideOut   = std::make_unique<Slide> (*this, *proc.apvts.getParameter ("outLevel"), sk, std::vector<float> { 1035.2f, 1065.8f, 1096.4f }, std::vector<float> { 0, 1, 2 }, 750.0f);
     for (auto* s : { slideEcho.get(), slideInput.get(), slideOut.get() }) addAndMakeVisible (s);
 
     glow = (float) NineHandsGlow::percent (JucePlugin_Name) / 100.0f;
