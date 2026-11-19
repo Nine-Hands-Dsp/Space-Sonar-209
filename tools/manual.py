@@ -28,6 +28,9 @@ subprocess.run(["rsvg-convert", "-w", "1200", os.path.join(ROOT, "logo", "NineHa
 def shot(name): return Image.open(os.path.join(SHOTS, name)).convert("RGB")
 src = shot("ss_default.png")
 k = src.width / 1600.0                                     # repere de l'interface : 1600 x 1400 unites
+FS, FCX, FCY = 1.12, 800.0, 780.0                          # facade agrandie (Layout.h)
+def F(x, y): return (FCX + (x - FCX) * FS, FCY + (y - FCY) * FS)
+def FB(b): (a0, b0), (a1, b1) = F(b[0], b[1]), F(b[2], b[3]); return (a0, b0, a1, b1)
 
 # ---------- capture annotee ----------
 MARKS = [(1, 440, 48), (2, 1172, 40), (3, 1245, 86), (4, 1366, 86), (5, 1461, 86), (6, 1540, 86),
@@ -37,6 +40,7 @@ MARKS = [(1, 440, 48), (2, 1172, 40), (3, 1245, 86), (4, 1366, 86), (5, 1461, 86
 ann = src.copy(); dr = ImageDraw.Draw(ann)
 fnt = ImageFont.truetype(os.path.join(ROOT, "fonts", "Poppins-Bold.ttf"), int(13 * k))
 for n, x, y in MARKS:
+    if 7 <= n <= 18: x, y = F(x, y)
     cx, cy, r = x * k, y * k, 14 * k
     dr.ellipse((cx - r, cy - r, cx + r, cy + r), fill=(255, 255, 255), outline=(52, 132, 58), width=int(2.5 * k))
     dr.text((cx, cy + 1), str(n), font=fnt, fill=(20, 32, 22), anchor="mm")
@@ -47,25 +51,23 @@ def crop_u(im, box, w=None):
     if w: c = c.resize((w, int(c.height * w / c.width)), Image.LANCZOS)
     return c
 def save(im, name): p = os.path.join(TMP, name); im.save(p, quality=90); return p
-facade = save(crop_u(src, (100, 270, 1500, 800), 1800), "ss_facade.jpg")
+facade = save(crop_u(src, FB((104, 268, 1496, 802)), 1800), "ss_facade.jpg")
 diag_dub = save(crop_u(shot("ss_dub.png"), (40, 960, 810, 1390), 1200), "ss_diagram.jpg")
 lower = save(crop_u(src, (810, 990, 1590, 1390), 1200), "ss_lower.jpg")
 header_st = save(crop_u(shot("ss_status.png"), (0, 0, 1600, 100), 1800), "ss_header.jpg")
 red = shot("ss_single_reverb_only.png").resize(src.size, Image.LANCZOS)
-jacks = save(crop_u(red, (110, 686, 1490, 790), 1800), "ss_jacks.jpg")
+jacks = save(crop_u(red, FB((110, 686, 1490, 790)), 1800), "ss_jacks.jpg")
 
 # ---------- couverture : l'appareil detoure (coffre en tolex + embouts), reflet au sol, halo vert tres doux ----------
-unit = crop_u(src, (14, 134, 1586, 920))
+unit = crop_u(src, (2, 112, 1598, 900))
 uw, uh = unit.size
 yy, xx = np.mgrid[0:uh, 0:uw].astype(np.float64)
 def rr(x0, y0, x1, y1, r):
-    x0, y0, x1, y1, r = [(v) * k for v in (x0 - 14, y0 - 134, x1 - 14, y1 - 134, r)]
+    x0, y0, x1, y1, r = [(v) * k for v in (x0 - 2, y0 - 112, x1 - 2, y1 - 112, r)]
     cx = np.clip(xx, x0 + r, x1 - r); cy = np.clip(yy, y0 + r, y1 - r)
     return np.clip(0.5 - (np.hypot(xx - cx, yy - cy) - r), 0, 1)
-m = rr(40, 140, 1560, 900, 40)
-for (x0, x1) in ((20, 46), (1554, 1580)):
-    for yc in (300, 700): m = np.maximum(m, rr(x0, yc - 34, x1, yc + 34, 8))
-m = np.maximum(m, rr(560, 896, 1040, 914, 4))
+m = rr(8, 118, 1592, 880, 34)
+m = np.maximum(m, rr(560, 876, 1040, 894, 4))
 cut = Image.new("RGBA", unit.size, (0, 0, 0, 0)); cut.paste(unit, (0, 0), Image.fromarray((m * 255).astype(np.uint8)))
 cut = cut.crop(cut.getbbox()); cw, ch = cut.size
 pad = int(cw * 0.16)

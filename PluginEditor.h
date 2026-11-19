@@ -76,7 +76,12 @@ public:
     NineHandsMenu::MenuLnf menuLnf;
     float k() const { return (float) getWidth() / ssl::kW; }
     juce::Rectangle<float> U (float x, float y, float w, float h) const { const float s = k(); return { x * s, y * s, w * s, h * s }; }
-    juce::Font font (int weight, float unitsHeight) const;     // 0 regular, 1 medium, 2 bold, 3 light (taille en unités du repère)
+    juce::Font font (int weight, float unitsHeight) const;
+    // façade agrandie : coordonnées d'origine de la façade -> repère de la fenêtre
+    static juce::AffineTransform fac() { return juce::AffineTransform::scale (ssl::kFS, ssl::kFS, ssl::kFCX, ssl::kFCY); }
+    static juce::Point<float> F (float x, float y) { return juce::Point<float> (x, y).transformedBy (fac()); }
+    static juce::Point<float> unF (juce::Point<float> p) { return p.transformedBy (fac().inverted()); }
+    void askRepaintFac (juce::Rectangle<float> r) { askRepaint (r.transformedBy (fac())); }     // 0 regular, 1 medium, 2 bold, 3 light (taille en unités du repère)
 
     void showStatus (const juce::String& s);
     void showParamMenu (const juce::String& paramId);

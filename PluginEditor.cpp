@@ -65,8 +65,8 @@ int Slide::position() const
 
 void Slide::place()
 {
-    const float s = ed.k();
-    setBounds (Rectangle<float> ((xs.front() - 22) * s, (y - 22) * s, (xs.back() - xs.front() + 44) * s, 44 * s).toNearestInt());
+    const auto r = Rectangle<float> (xs.front() - 22, y - 22, xs.back() - xs.front() + 44, 44).transformedBy (SpaceSonarEditor::fac());
+    setBounds (r.transformedBy (AffineTransform::scale (ed.k())).toNearestInt());
 }
 
 int Slide::nearest (float unitX) const
@@ -80,7 +80,7 @@ void Slide::setPos (int i) { if (i != position()) att.setValueAsCompleteGesture 
 
 void Slide::paint (Graphics& g)
 {
-    const float s = ed.k();
+    const float s = ed.k() * ssl::kFS;
     const float x = xs[(size_t) position()];
     const auto r = Rectangle<float> (40 * s, 40 * s).withCentre ({ (x - xs.front() + 22) * s, 22 * s });
     g.setImageResamplingQuality (Graphics::highResamplingQuality);
@@ -90,10 +90,10 @@ void Slide::paint (Graphics& g)
 void Slide::mouseDown (const MouseEvent& e)
 {
     if (e.mods.isPopupMenu()) { ed.showParamMenu (param.paramID); return; }
-    setPos (nearest (e.position.x / ed.k() + xs.front() - 22));
+    setPos (nearest (e.position.x / (ed.k() * ssl::kFS) + xs.front() - 22));
 }
 
-void Slide::mouseDrag (const MouseEvent& e) { if (! e.mods.isPopupMenu()) setPos (nearest (e.position.x / ed.k() + xs.front() - 22)); }
+void Slide::mouseDrag (const MouseEvent& e) { if (! e.mods.isPopupMenu()) setPos (nearest (e.position.x / (ed.k() * ssl::kFS) + xs.front() - 22)); }
 
 //==============================================================================
 //  Fenêtre
@@ -129,10 +129,10 @@ SpaceSonarEditor::SpaceSonarEditor (SpaceSonarProcessor& p)
                              png (BinaryData::knob_black_highlight_png, BinaryData::knob_black_highlight_pngSize) };
 
     knobPos = {
-        { "micVol", 190, 619, 31, false }, { "paVol", 345, 619, 31, false }, { "instVol", 500, 619, 31, false },
+        { "micVol", 190, 619, 34, false }, { "paVol", 345, 619, 34, false }, { "instVol", 500, 619, 34, false },
         { "mode", 689, 528, 44, false },
-        { "bass", 882, 478, 30, false }, { "treble", 1020, 478, 30, false }, { "reverbVol", 1158, 478, 30, false },
-        { "repeatRate", 882, 612, 30, false }, { "intensity", 1020, 612, 30, false }, { "echoVol", 1158, 612, 30, false },
+        { "bass", 882, 478, 33, false }, { "treble", 1020, 478, 33, false }, { "reverbVol", 1158, 478, 33, false },
+        { "repeatRate", 882, 612, 33, false }, { "intensity", 1020, 612, 33, false }, { "echoVol", 1158, 612, 33, false },
         { "speed", 1120, 1170, 24, true }, { "lfoRate", 1310, 1170, 24, true }, { "lfoShape", 1410, 1170, 24, true }, { "lfoDepth", 1510, 1170, 24, true },
         { "condition", 905, 1330, 24, true }, { "wf", 1010, 1330, 24, true }, { "motor", 1120, 1330, 24, true },
         { "lowCut", 1265, 1330, 24, true }, { "highCut", 1385, 1330, 24, true }, { "master", 1510, 1330, 24, true } };
@@ -202,10 +202,12 @@ void SpaceSonarEditor::resized()
     for (size_t i = 0; i < knobs.size(); ++i)
     {
         const auto& kp = knobPos[i];
-        const float side = 2.0f * kp.r * 1.30f;
-        knobs[i]->setBounds (Rectangle<float> (side * s, side * s).withCentre ({ kp.x * s, kp.y * s }).toNearestInt());
+        const float fsz = kp.black ? 1.0f : ssl::kFS;                      // potards de la façade : façade agrandie
+        const auto c = kp.black ? Point<float> (kp.x, kp.y) : F (kp.x, kp.y);
+        const float side = 2.0f * kp.r * 1.30f * fsz;
+        knobs[i]->setBounds (Rectangle<float> (side * s, side * s).withCentre (c * s).toNearestInt());
     }
-    power->setBounds (Rectangle<float> (80 * s, 80 * s).withCentre ({ 1412 * s, 622 * s }).toNearestInt());
+    power->setBounds (Rectangle<float> (80 * ssl::kFS * s, 80 * ssl::kFS * s).withCentre (F (1412, 622) * s).toNearestInt());
     for (auto* sl : { slideEcho.get(), slideInput.get(), slideOut.get() }) sl->place();
     resizeSettle = 4;
 }
@@ -266,7 +268,7 @@ void SpaceSonarEditor::rebuildCache()
             g.drawText (String::fromUTF8 (x.s), r, x.left ? Justification::centredLeft : Justification::centred, false);
         }
         if (logo != nullptr)
-            logo->drawWithin (g, Rectangle<float> (1236, 310, 220, 34), RectanglePlacement::xRight | RectanglePlacement::yMid, 0.92f);
+            logo->drawWithin (g, Rectangle<float> (1236, 310, 220, 34).transformedBy (fac()), RectanglePlacement::xRight | RectanglePlacement::yMid, 0.92f);
     }
     cache = img;
     cacheScale = phys;
@@ -372,26 +374,39 @@ void SpaceSonarEditor::paintHeader (Graphics& g)
     for (int i = 0; i < 3; ++i) g.fillRoundedRectangle (Rectangle<float> (1526, 37.0f + 9.0f * (float) i, 28, 2), 1);
 }
 
+// VU (photo fournie) : pivot de l'aiguille sous la vitre, angle d'après la graduation de la photo
+namespace vuGeo
+{
+    const Rectangle<float> face (250.6f, 397.4f, 190.8f, 92.8f);       // vitre (unités de façade)
+    const Point<float> pivot (349.1f, 580.4f);
+    constexpr float tipR = 164.0f;
+    // dB -> angle (degrés) mesurés sur la photo
+    inline float angleFor (float db)
+    {
+        static const float d[8] = { -20, -10, -7, -5, -3, -1, 0, 3 };
+        static const float a[8] = { -25.4f, -18.2f, -13.1f, -6.0f, 0.7f, 7.9f, 13.5f, 25.7f };
+        if (db <= d[0]) return a[0] - 2.0f * jlimit (0.0f, 1.0f, (d[0] - db) / 20.0f);
+        for (int i = 1; i < 8; ++i) if (db <= d[i]) return a[i - 1] + (a[i] - a[i - 1]) * (db - d[i - 1]) / (d[i] - d[i - 1]);
+        return jmin (29.0f, a[7] + (db - 3.0f) * 1.5f);
+    }
+}
+
 void SpaceSonarEditor::paintFacadeLive (Graphics& g)
 {
-    // VU : rétroéclairage + aiguille
-    const Rectangle<float> face (252, 394, 188, 100);
+    Graphics::ScopedSaveState fs (g);
+    g.addTransform (fac());
+    // VU : aiguille (sous la vitre, ombre portée à 45° vers le bas à droite)
     {
         Graphics::ScopedSaveState ss (g);
-        g.reduceClipRegion (face.toNearestInt());
-        if (powerLevel > 0.01f)
-        {
-            ColourGradient gl (col::vuGlow.withAlpha (0.20f * powerLevel), face.getCentreX(), face.getBottom(), col::vuGlow.withAlpha (0.0f),
-                               face.getCentreX(), face.getY() - 30, true);
-            g.setGradientFill (gl); g.fillRect (face);
-        }
-        const Point<float> pv (346, 520);
+        g.reduceClipRegion (vuGeo::face.toNearestInt());
         const float a = degreesToRadians (vuAngle);
-        const Point<float> tip = pv + Point<float> (std::sin (a), -std::cos (a)) * 99.0f;
-        g.setColour (Colours::black.withAlpha (0.35f));
-        g.drawLine ({ pv.translated (1.5f, 1.5f), tip.translated (1.5f, 1.5f) }, 1.6f);
-        g.setColour (Colour (0xffe6ebe4));
-        g.drawLine ({ pv, tip }, 1.4f);
+        const Point<float> dir (std::sin (a), -std::cos (a));
+        const Point<float> tip = vuGeo::pivot + dir * vuGeo::tipR;
+        const Point<float> base = vuGeo::pivot + dir * (vuGeo::pivot.y - vuGeo::face.getBottom() + 4.0f) / std::cos (a);
+        g.setColour (Colours::black.withAlpha (0.45f));
+        g.drawLine ({ base.translated (1.6f, 1.6f), tip.translated (1.6f, 1.6f) }, 1.5f);
+        g.setColour (Colour (0xfff2f4ee));
+        g.drawLine ({ base, tip }, 1.2f);
     }
     // LED PEAK LEVEL et témoin secteur
     auto led = [&] (Point<float> c, float level)
@@ -415,8 +430,8 @@ void SpaceSonarEditor::paintFacadeLive (Graphics& g)
     // prises : entrée choisie (bleu), sortie (orange), ECHO CANCEL actif (rouge)
     auto ringAt = [&] (Point<float> c, Colour cl)
     {
-        g.setColour (cl.withAlpha (0.25f * glow)); g.drawEllipse (Rectangle<float> (36, 36).withCentre (c), 3.0f);
-        g.setColour (cl); g.drawEllipse (Rectangle<float> (28.5f, 28.5f).withCentre (c), 2.4f);
+        g.setColour (cl.withAlpha (0.28f * glow)); g.drawEllipse (Rectangle<float> (50, 50).withCentre (c), 3.2f);
+        g.setColour (cl); g.drawEllipse (Rectangle<float> (44, 44).withCentre (c), 2.4f);
     };
     static const Point<float> ins[3] = { { 198, 748 }, { 353, 748 }, { 478, 748 } };
     ringAt (ins[jlimit (0, 2, (int) proc.prm.inputSel->load())], col::blue);
@@ -646,9 +661,12 @@ void SpaceSonarEditor::mouseDown (const MouseEvent& e)
         { Rectangle<float> (80, 60).withCentre ({ 905, 1162 }), "stereo" }, { Rectangle<float> (170, 64).withCentre ({ 1120, 1062 }), "rateRange" },
         { { 1278, 1032, 266, 28 }, "lfoWave" }, { { 1252, 696, 220, 84 }, "echoCancel" },
         { { 128, 696, 140, 84 }, "inputSel" }, { { 276, 696, 154, 84 }, "inputSel" }, { { 438, 696, 140, 84 }, "inputSel" } };
+    const auto pf = unF (p);
+    auto inF = [&] (float x, float y, float w, float h) { return Rectangle<float> (x, y, w, h).contains (pf); };
     if (rc)
     {
-        for (const auto& z : zones) if (z.r.contains (p)) { showParamMenu (z.id); return; }
+        for (int zi = 0; zi < (int) std::size (zones); ++zi)
+            if ((zi >= 5 ? zones[zi].r.contains (pf) : zones[zi].r.contains (p))) { showParamMenu (zones[zi].id); return; }
         if (! in (0, 0, 1600, 96)) showContextMenu();
         return;
     }
@@ -677,10 +695,10 @@ void SpaceSonarEditor::mouseDown (const MouseEvent& e)
 
     beginUndo();
     // bandeau des prises : choix de l'entrée, ECHO CANCEL
-    if (in (128, 696, 140, 84)) { proc.setParam ("inputSel", 0); return; }
-    if (in (276, 696, 154, 84)) { proc.setParam ("inputSel", 1); return; }
-    if (in (438, 696, 140, 84)) { proc.setParam ("inputSel", 2); return; }
-    if (in (1252, 696, 220, 84)) { proc.setParam ("echoCancel", proc.prm.echoCancel->load() > 0.5f ? 0.0f : 1.0f); return; }
+    if (inF (128, 696, 140, 84)) { proc.setParam ("inputSel", 0); return; }
+    if (inF (276, 696, 154, 84)) { proc.setParam ("inputSel", 1); return; }
+    if (inF (438, 696, 140, 84)) { proc.setParam ("inputSel", 2); return; }
+    if (inF (1252, 696, 220, 84)) { proc.setParam ("echoCancel", proc.prm.echoCancel->load() > 0.5f ? 0.0f : 1.0f); return; }
     // panneau étendu
     if (inC (905, 1046, 110, 26)) { proc.setParam ("sync", proc.prm.sync->load() > 0.5f ? 0.0f : 1.0f); return; }
     if (inC (905, 1146, 80, 26)) { proc.setParam ("stereo", 0); return; }
@@ -982,20 +1000,19 @@ void SpaceSonarEditor::timerCallback()
     // VU (aiguille), LED, vumètres
     const bool on = proc.prm.power->load() > 0.5f;
     const float pl = on ? jmin (1.0f, powerLevel + 0.45f) : jmax (0.0f, powerLevel - 0.28f);
-    if (std::abs (pl - powerLevel) > 0.001f) { powerLevel = pl; askRepaint ({ 1290, 594, 56, 56 }); askRepaint ({ 245, 387, 202, 114 }); }
+    if (std::abs (pl - powerLevel) > 0.001f) { powerLevel = pl; askRepaintFac ({ 1290, 594, 56, 56 }); }
     {
         const float lvl = proc.vu.load();
         const float db = 20.0f * std::log10 (jmax (1.0e-5f, lvl / 0.9f)) + 18.0f;         // 0 VU = -18 dBFS
-        const float volts = jlimit (0.0f, 1.0f, (std::pow (10.0f, jlimit (-20.0f, 3.5f, db) / 20.0f) - 0.1f) / (1.413f - 0.1f));
-        const float ang = -46.0f + 92.0f * volts;
+        const float ang = on ? vuGeo::angleFor (db) : vuGeo::angleFor (-40.0f);
         const float shown = vuAngle + (ang - vuAngle) * 0.35f;
-        if (std::abs (shown - vuAngle) > 0.04f) { vuAngle = shown; askRepaint ({ 252, 394, 188, 100 }); }
+        if (std::abs (shown - vuAngle) > 0.03f) { vuAngle = shown; askRepaintFac (vuGeo::face); }
     }
     {
         const float pk = proc.peak.exchange (0.0f);
         const float tgt = pk > 0.89f ? 1.0f : 0.0f;
         const float np = tgt > peakLevel ? 1.0f : jmax (0.0f, peakLevel - 0.12f);
-        if (std::abs (np - peakLevel) > 0.001f) { peakLevel = np; askRepaint ({ 172, 408, 56, 56 }); }
+        if (std::abs (np - peakLevel) > 0.001f) { peakLevel = np; askRepaintFac ({ 172, 408, 56, 56 }); }
     }
     bool meters = false;
     for (int c = 0; c < 2; ++c)

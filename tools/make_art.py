@@ -94,7 +94,15 @@ G2 = (196, 202, 198, 255)
 
 # ====================================================================== textes (dessines par l'editeur)
 TEXTS = []          # (x, y, texte, taille, graisse, argb, interlettrage, ancre)
+# facade agrandie (demande de l'utilisateur, v1.0.2) : coordonnees d'origine -> X = FCX + (x - FCX) * FS
+FS, FCX, FCY = 1.12, 800.0, 780.0
+FAC = False
+def fxy(x, y): return (FCX + (x - FCX) * FS, FCY + (y - FCY) * FS)
+
+
 def T(x, y, s, size, weight='Medium', col=WHITE, track=0.0, anchor='mm', rot=0.0):
+    if FAC:
+        x, y = fxy(x, y); size *= FS; track *= FS
     TEXTS.append((x, y, s, size, weight, col, track, anchor, rot))
 
 
@@ -127,21 +135,31 @@ stage = (yy >= U(96)) * (yy < U(912)) * allm
 img = fill(img, stage, (40 + 10 * np.clip(1 - (yy - U(96)) / U(800), 0, 1) + noise(0.8, 1.0))[..., None] * np.ones(3))
 
 # appareil (tolex)
-TX0, TY0, TX1, TY1 = 40, 140, 1560, 900
-tolex_m = rrect_mask(TX0, TY0, TX1, TY1, 40)
+TX0, TY0, TX1, TY1 = 8, 118, 1592, 880
+tolex_m = rrect_mask(TX0, TY0, TX1, TY1, 34)
 img = soft_shadow(img, tolex_m, 6, 8, 12, 0.6)
 tol = 26 + noise(2.0, 5.0) + noise(0.7, 3.0) + noise(0.0, 1.5)
 img = fill(img, tolex_m, tol[..., None] * np.array([1.0, 1.0, 1.03]))
-rim = np.clip(tolex_m - rrect_mask(TX0 + 6, TY0 + 6, TX1 - 6, TY1 - 6, 34), 0, 1)
+rim = np.clip(tolex_m - rrect_mask(TX0 + 6, TY0 + 6, TX1 - 6, TY1 - 6, 28), 0, 1)
 img += (rim * 14)[..., None]
-for (x0, x1) in ((20, 46), (1554, 1580)):
-    for yc in (300, 700):
-        hm = rrect_mask(x0, yc - 34, x1, yc + 34, 8)
-        img = soft_shadow(img, hm, 3, 3, 4, 0.5)
-        img = fill(img, hm, (60 + 50 * np.clip(1 - ((xx - U(x0)) + (yy - U(yc - 34))) / U(90), 0, 1))[..., None] * np.ones(3))
-foot = rrect_mask(560, 900, 1040, 914, 4)
+foot = rrect_mask(560, 880, 1040, 894, 4)
 img = fill(img, foot, np.array([18, 18, 18]))
 
+# ---- facade : dessinee dans ses coordonnees d'origine, evaluee directement aux pixels finaux (aucun agrandissement d'image)
+xx_fin, yy_fin = xx, yy
+xx = (FCX * AS + (xx_fin - FCX * AS) / FS).astype(np.float32)
+yy = (FCY * AS + (yy_fin - FCY * AS) / FS).astype(np.float32)
+FAC = True
+_line_layer0 = line_layer
+class _FacDraw:
+    def __init__(self, d): self.d = d
+    def _p(self, v, axis): return (FCX if axis == 0 else FCY) * AS + (v - (FCX if axis == 0 else FCY) * AS) * FS
+    def line(self, pts, fill=None, width=1, **kw):
+        q = [self._p(v, i % 2) for i, v in enumerate(pts)]
+        self.d.line(q, fill=fill, width=max(1, int(round(width * FS))), **kw)
+def line_layer():
+    t, d = _line_layer0()
+    return t, _FacDraw(d)
 FX0, FX1, FY0, FY1 = 116, 1484, 280, 790
 fr_m = rrect_mask(FX0 - 9, FY0 - 9, FX1 + 9, FY1 + 9, 8)
 img = soft_shadow(img, fr_m, 5, 5, 7, 0.6)
@@ -160,38 +178,29 @@ for y in (373, 685):
     ln = np.clip(1 - np.abs(yy - U(y)) / U(1.6), 0, 1) * (xx > U(FX0)) * (xx < U(FX1))
     img *= (1 - 0.8 * ln)[..., None]
 
-# separation + panneau etendu + ecran du schema
-img = fill(img, (yy >= U(912)) * (yy < U(946)) * allm, np.array([24, 25, 26]))
-img = fill(img, rrect_mask(700, 918, 900, 940, 6), np.array([46, 48, 50]))
-img = fill(img, (yy >= U(946)) * allm, (33 + noise(0.8, 1.0))[..., None] * np.array([0.97, 0.99, 1.02]))
-SX0, SY0, SX1, SY1 = 50, 990, 800, 1380
-scr = rrect_mask(SX0, SY0, SX1, SY1, 8)
-img = fill(img, scr, (16 + noise(1.0, 0.8))[..., None] * np.ones(3))
-inn = cv2.GaussianBlur(1 - scr, (0, 0), U(4))
-img *= (1 - 0.5 * scr * np.clip(np.roll(np.roll(inn, int(U(2)), 0), int(U(2)), 1), 0, 1))[..., None]
+# VU : photo fournie par l'utilisateur (assets/photos/vu_meter_src.png) ; aiguille dessinee par l'editeur
+PHOTOS = os.path.join(OUT, 'photos')
+VU_SRC_BOX = (19, 303, 1236, 950)                    # lunette dans la photo (px)
+VU_BOX = (239.0, 387.0, 453.0, 501.0)                # lunette sur la facade (unites d'origine)
 
-# eclairage 45 deg (appareil seulement : facade, tolex)
-t = ((xx / PW) + (yy / U(912))) / 2.0
-img = img * (1 + tolex_m * (0.08 - 0.20 * t))[..., None]
 
-# VU : lunette, face noire retroeclairee, graduations (aiguille et lueur : editeur)
-vx0, vy0, vx1, vy1 = 252, 394, 440, 494
-bez = rrect_mask(vx0 - 7, vy0 - 7, vx1 + 7, vy1 + 7, 4)
-img = soft_shadow(img, bez, 3, 3, 4, 0.5)
-img = fill(img, bez, (110 + 90 * np.clip(1 - ((xx - U(vx0)) + (yy - U(vy0))) / U(230), 0, 1))[..., None] * np.ones(3))
-face = rrect_mask(vx0, vy0, vx1, vy1, 3)
-img = fill(img, face, np.array([10, 13, 11]))
-L, td = line_layer()
-vc = ((vx0 + vx1) / 2, vy1 + 26); vr = 96
-GLOWG = (160, 238, 176, 255); RED = (236, 76, 60, 255)
-for i in range(11):
-    a = math.radians(-46 + 92 * i / 10 - 90)
-    r0 = vr - 7 - (4 if i % 2 == 0 else 0)
-    td.line([U(vc[0] + r0 * math.cos(a)), U(vc[1] + r0 * math.sin(a)), U(vc[0] + vr * math.cos(a)), U(vc[1] + vr * math.sin(a))], fill=RED if i >= 7 else GLOWG, width=int(U(1.5)))
-td.arc([U(vc[0] - vr), U(vc[1] - vr), U(vc[0] + vr), U(vc[1] + vr)], -136, -81.4, fill=GLOWG, width=int(U(1.4)))
-td.arc([U(vc[0] - vr), U(vc[1] - vr), U(vc[0] + vr), U(vc[1] + vr)], -81.4, -44, fill=RED, width=int(U(3)))
-img = comp(img, L)
-T(vc[0], vy1 - 30, 'VU', 13, 'Medium', GLOWG)
+def paste_photo(img, rgba, box_units, shadow=(3.0, 3.0, 4.0, 0.5)):
+    """pose une photo RGBA (reduite, jamais agrandie) dans une boite en unites de facade, avec ombre portee a 45 deg"""
+    (X0, Y0), (X1, Y1) = fxy(box_units[0], box_units[1]), fxy(box_units[2], box_units[3])
+    w, h = int(round(U(X1 - X0))), int(round(U(Y1 - Y0)))
+    assert w <= rgba.width and h <= rgba.height, 'agrandissement interdit'
+    ph = np.asarray(rgba.resize((w, h), Image.LANCZOS), np.float32)
+    x0, y0 = int(round(U(X0))), int(round(U(Y0)))
+    al = ph[..., 3:4] / 255.0
+    if shadow:
+        m = np.zeros((PH, PW), np.float32); m[y0:y0 + h, x0:x0 + w] = al[..., 0]
+        img = soft_shadow(img, m, shadow[0] * FS, shadow[1] * FS, shadow[2] * FS, shadow[3])
+    img[y0:y0 + h, x0:x0 + w] = img[y0:y0 + h, x0:x0 + w] * (1 - al) + ph[..., :3] * al
+    return img
+
+
+vu_src = Image.open(os.path.join(PHOTOS, 'vu_meter_src.png')).convert('RGBA').crop(VU_SRC_BOX)
+img = paste_photo(img, vu_src, VU_BOX)
 
 # ====================================================================== serigraphies (textes) + graduations
 T(150, 328, 'SPACE SONAR', 36, 'Bold', BLACK, 2.5, 'lm')
@@ -253,16 +262,20 @@ for i, s_ in enumerate('HML'):
 T(1380, 764, 'ON   ·   OFF', 8.5, 'Medium', BLACK, 0.8)
 
 
+# prise jack : photo fournie (hexagone pointe a gauche et a droite), detouree ici (le damier de la photo n'est pas transparent)
+_js = np.asarray(Image.open(os.path.join(PHOTOS, 'jack_src.png')).convert('RGB'), np.float32)
+_jy, _jx = np.mgrid[0:_js.shape[0], 0:_js.shape[1]].astype(np.float32)
+JC, JR = (620.0, 627.0), 574.0                        # centre et rayon (sommet) de l'hexagone, px
+_ang = np.arctan2(_jy - JC[1], _jx - JC[0])
+_hexr = JR * np.cos(math.pi / 6) / np.cos(((_ang) % (math.pi / 3)) - math.pi / 6)
+_jal = np.clip((_hexr - np.hypot(_jx - JC[0], _jy - JC[1])) / 1.5, 0, 1)
+_jbox = (int(JC[0] - JR), int(JC[1] - JR), int(JC[0] + JR), int(JC[1] + JR))
+JACK_RGBA = Image.fromarray(np.dstack([_js, _jal * 255]).astype(np.uint8), 'RGBA').crop(_jbox)
+JACK_R = 19.0                                          # rayon (sommet) sur la facade, unites d'origine
+
+
 def jack(img, x, y):
-    nut = disk(x, y, 17)
-    img = soft_shadow(img, nut, 2.5, 2.5, 3, 0.5)
-    ang = np.arctan2(yy - U(y), xx - U(x))
-    hexr = U(17) * np.cos(math.pi / 6) / np.cos(((ang + math.pi / 6) % (math.pi / 3)) - math.pi / 6)
-    hexm = np.clip(hexr - np.hypot(xx - U(x), yy - U(y)), 0, 1)
-    sh = 120 + 90 * np.clip(1 - ((xx - U(x - 17)) + (yy - U(y - 17))) / U(68), 0, 1)
-    img = fill(img, hexm, sh[..., None] * np.ones(3))
-    img = fill(img, ring(x, y, 8, 11.5), (190 - 70 * np.clip(((xx - U(x)) + (yy - U(y))) / U(24) + 0.5, 0, 1))[..., None] * np.ones(3))
-    return fill(img, disk(x, y, 7.5), np.array([8, 8, 8]))
+    return paste_photo(img, JACK_RGBA, (x - JACK_R, y - JACK_R, x + JACK_R, y + JACK_R), (2.5, 2.5, 3.0, 0.55))
 
 
 JACKS = [(198, 748), (353, 748), (478, 748), (1200, 748), (1296, 748)]
@@ -271,6 +284,25 @@ for (x, y) in JACKS:
 SLIDES = [(590, 684, 744), (764, 878, 744), (1028, 1104, 750)]
 for (x0, x1, y) in SLIDES:
     img = fill(img, rrect_mask(x0, y - 4.5, x1, y + 4.5, 4.5), np.array([12, 12, 12]))
+
+FAC = False
+xx, yy = xx_fin, yy_fin
+line_layer = _line_layer0
+
+# separation + panneau etendu + ecran du schema
+img = fill(img, (yy >= U(912)) * (yy < U(946)) * allm, np.array([24, 25, 26]))
+img = fill(img, rrect_mask(700, 918, 900, 940, 6), np.array([46, 48, 50]))
+img = fill(img, (yy >= U(946)) * allm, (33 + noise(0.8, 1.0))[..., None] * np.array([0.97, 0.99, 1.02]))
+SX0, SY0, SX1, SY1 = 50, 990, 800, 1380
+scr = rrect_mask(SX0, SY0, SX1, SY1, 8)
+img = fill(img, scr, (16 + noise(1.0, 0.8))[..., None] * np.ones(3))
+inn = cv2.GaussianBlur(1 - scr, (0, 0), U(4))
+img *= (1 - 0.5 * scr * np.clip(np.roll(np.roll(inn, int(U(2)), 0), int(U(2)), 1), 0, 1))[..., None]
+
+# eclairage 45 deg (appareil seulement : facade, tolex)
+t = ((xx / PW) + (yy / U(912))) / 2.0
+img = img * (1 + tolex_m * (0.08 - 0.20 * t))[..., None]
+
 
 # panneau etendu : titres
 T(425, 975, 'BLOCK DIAGRAM', 11, 'Medium', G2, 1.3)
@@ -335,21 +367,45 @@ def shadow_layer(a):
 rgb, a = kit_knob_full()
 body = (kr <= 1.0).astype(np.float32) * a
 v = rgb.mean(2)
-# --- chrome molete (facade)
-chrome = np.clip(62 + 1.75 * v, 0, 255)
-knurl_zone = ((kr > 0.80) & (kr <= 1.0)).astype(np.float32)
-knurl = 0.5 + 0.5 * np.sign(np.sin(kth * 60))
-base = radial_avg(chrome, body)
-crown_rgb = base * (1 - 0.22 * knurl * knurl_zone)
-save_layer('knob_chrome_shadow', *shadow_layer(a))
-save_layer('knob_chrome_crown', np.dstack([crown_rgb] * 3) * np.array([0.98, 0.99, 1.0]), a * knurl_zone)
-save_layer('knob_chrome_cap', np.dstack([base] * 3) * np.array([0.98, 0.99, 1.0]), a * (kr <= 0.80))
-m = Image.new('L', (N, N), 0); dm = ImageDraw.Draw(m)
-dm.line([kc, kc - RPX * 0.10, kc, kc - RPX * 0.74], fill=255, width=int(RPX * 0.085))
-mm = cv2.GaussianBlur(np.asarray(m, np.float32) / 255.0, (0, 0), 1.0)
-save_layer('knob_chrome_marker', np.full((N, N, 3), 18.0), mm)
-hl_rgb, hl_a = highlight_from(chrome, base, body)
+# --- potard de facade : photo fournie (assets/photos/knob_src.png) : bague exterieure brossee, couronne crantee noire,
+#     chapeau brosse avec fente noire. Couronne, fente et matiere tournent ; reflets coniques fixes (calque highlight).
+KC, KR = (612.9, 631.5), 497.0                         # centre et rayon de la photo (px)
+ksrc = np.asarray(Image.open(os.path.join(OUT, 'photos', 'knob_src.png')).convert('RGBA'), np.float32)
+sc = KR / RPX
+mapx = (KC[0] + (kx - kc) * sc).astype(np.float32); mapy = (KC[1] + (ky - kc) * sc).astype(np.float32)
+kp = cv2.remap(ksrc, mapx, mapy, cv2.INTER_AREA if sc > 1 else cv2.INTER_LINEAR, borderValue=(255, 255, 255, 0))
+kv = kp[..., :3].mean(2)
+ka = np.clip(kp[..., 3] / 255.0, 0, 1) * (kr <= 1.0)
+R_CAP, R_RING = 0.615, 0.795                            # chapeau / couronne crantee / bague exterieure
+# fente du chapeau (photo decalee de ~7 px a droite du centre) : extraite puis recentree
+slot = np.zeros((N, N), np.float32)
+SX = (620.0 - KC[0]) / sc
+slotm = (np.abs(kx - (kc + SX)) < 0.042 * RPX) & (ky < kc - 0.15 * RPX) & (kr < R_CAP + 0.04) & (kv < 95)
+slot[slotm] = 1.0
+slot = cv2.GaussianBlur(slot, (0, 0), 1.2)
+shiftM = np.float32([[1, 0, -SX], [0, 1, 0]])
+slot_c = cv2.warpAffine(slot, shiftM, (N, N))
+slot_rgb = cv2.warpAffine(np.dstack([kv] * 3).astype(np.float32), shiftM, (N, N))
+capz = (kr <= R_CAP).astype(np.float32); crownz = ((kr > R_CAP) & (kr <= R_RING)).astype(np.float32); ringz = ((kr > R_RING) & (kr <= 1.0)).astype(np.float32)
+# matiere sans la fente pour le profil radial
+kv_noslot = np.where(cv2.dilate((slot > 0.02).astype(np.uint8), np.ones((9, 9), np.uint8)) > 0, np.nan, kv)
+def radial_avg_nan(v, a):
+    bins = np.clip((kr * 400).astype(int), 0, 799)
+    ok = ~np.isnan(v)
+    s_ = np.bincount(bins[ok].ravel(), (v[ok] * a[ok]).ravel(), 800); w_ = np.bincount(bins[ok].ravel(), a[ok].ravel(), 800)
+    return (s_ / np.maximum(w_, 1e-6))[bins]
+basek = radial_avg_nan(kv_noslot, ka)
+save_layer('knob_chrome_shadow', *shadow_layer(ka))
+save_layer('knob_chrome_crown', kp[..., :3], ka * crownz)                    # couronne crantee : photo, tourne
+save_layer('knob_chrome_cap', np.dstack([basek] * 3), ka * (capz + ringz))   # matiere brossee invariante par rotation
+save_layer('knob_chrome_marker', slot_rgb, np.clip(slot_c, 0, 1))           # fente noire, pointee vers le haut
+slot_big = cv2.dilate((slot > 0.02).astype(np.uint8), np.ones((9, 9), np.uint8)).astype(bool)
+tgt = np.where(slot_big, basek, kv)
+hl_rgb, hl_a = highlight_from(tgt, basek, ka * (capz + ringz))
 save_layer('knob_chrome_highlight', hl_rgb, hl_a)
+# pour le selecteur de mode (inchange) : chrome du kit
+chrome = np.clip(62 + 1.75 * v, 0, 255)
+base = radial_avg(chrome, body)
 # --- noir (panneau etendu)
 baseb = radial_avg(v, body)
 save_layer('knob_black_shadow', *shadow_layer(a))
@@ -420,6 +476,7 @@ def cstr(s):
 W_ = {'Regular': 0, 'Medium': 1, 'Bold': 2, 'Light': 3}
 lines = ['#pragma once', '// genere par tools/make_art.py : ne pas modifier a la main', '#include <cstdint>', '',
          'namespace ssl', '{', '    constexpr float kW = %d.0f, kH = %d.0f;   // repere de l\'interface (100 %%)' % (W, H),
+         '    constexpr float kFS = %.4ff, kFCX = %.1ff, kFCY = %.1ff;   // facade agrandie : X = kFCX + (x - kFCX) * kFS' % (FS, FCX, FCY),
          '    struct Txt { float x, y; const char* s; float size; int weight; uint32_t argb; float track; bool left; float rot; };',
          '    inline const Txt* texts (int& n)', '    {', '        static const Txt t[] = {']
 for (x, y, s, size, w, col, tr, anc, rot) in TEXTS:
