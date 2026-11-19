@@ -1,7 +1,7 @@
 """
 Space Sonar 209 (NINE HANDS | DSP) - images du plugin, d'apres l'apercu valide (design/preview.png, v3).
 
-Repere de l'interface : 1600 x 1400 unites (fenetre a 100 %). Fond rendu a AS = 2 px par unite (3200 x 2800).
+Repere de l'interface : 1600 x 1400 unites (fenetre a 100 %). Fond rendu a AS = 3 px par unite (4800 x 4200).
 Le fond ne contient que la matiere fixe ; l'editeur dessine par-dessus, en vectoriel et a la resolution de l'ecran :
 textes (Poppins), logo NINE HANDS | DSP (SVG officiel), aiguille du VU, anneaux des prises actives, schema bloc,
 boutons ; et pose les commandes animees (potards nh::Knob en calques, inverseur, LED, glissieres).
@@ -26,7 +26,7 @@ sys.path.insert(0, HERE)
 import photo_controls as pc
 import toggle_photo as tp
 
-AS = 2
+AS = 3                                   # 3 px par unite : net jusqu a 150 % sur ecran Retina / 4K a 200 %
 W, H = 1600, 1400
 PW, PH = W * AS, H * AS
 rng = np.random.default_rng(7)

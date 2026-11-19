@@ -6,7 +6,7 @@ if(APPLE)
   set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "" FORCE)
 endif()
 
-project(SpaceSonar209 VERSION 1.0.4)
+project(SpaceSonar209 VERSION 1.0.5)
 
 include(FetchContent)
 FetchContent_Declare(JUCE

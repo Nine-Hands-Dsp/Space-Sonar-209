@@ -34,8 +34,16 @@ bool Toggle::hitTest (int x, int y) { return getLocalBounds().toFloat().reduced 
 
 void Toggle::paint (Graphics& g)
 {
+    const int i = mid > 0 ? 1 : on ? 0 : 2;
     g.setImageResamplingQuality (Graphics::highResamplingQuality);
-    g.drawImage (frames[mid > 0 ? 1 : on ? 0 : 2], getLocalBounds().toFloat());
+    g.drawImage (shown[i].isValid() ? shown[i] : frames[i], getLocalBounds().toFloat());
+}
+
+void Toggle::rescale (float phys)
+{
+    const int w = roundToInt ((float) getWidth() * phys), h = roundToInt ((float) getHeight() * phys);
+    for (int i = 0; i < 3; ++i) shown[i] = nh::downscale (frames[i], w, h);
+    repaint();
 }
 
 void Toggle::mouseDown (const MouseEvent& e)
@@ -78,15 +86,25 @@ int Slide::nearest (float unitX) const
 
 void Slide::setPos (int i) { if (i != position()) att.setValueAsCompleteGesture (values[(size_t) i]); }
 
-void Slide::paint (Graphics& g)
+// bouton de la photo : 261 x 214 px pour une cavité de 26 unités de haut, centre du bouton à 133,5 px du bord gauche
+Rectangle<float> Slide::knobRect (float x) const
 {
     const float s = ed.k() * ssl::kFS;
-    const float x = xs[(size_t) position()];
-    // bouton de la photo : 261 x 214 px pour une cavité de 26 unités de haut, centre du bouton à 133,5 px du bord gauche
     constexpr float su = 26.0f / 214.0f;
-    const auto r = Rectangle<float> ((x - xs.front() + 22 - 133.5f * su) * s, (22 - 13) * s, 261.0f * su * s, 26 * s);
+    return { (x - xs.front() + 22 - 133.5f * su) * s, (22 - 13) * s, 261.0f * su * s, 26 * s };
+}
+
+void Slide::paint (Graphics& g)
+{
     g.setImageResamplingQuality (Graphics::highResamplingQuality);
-    g.drawImage (knob, r);
+    g.drawImage (shown.isValid() ? shown : knob, knobRect (xs[(size_t) position()]));
+}
+
+void Slide::rescale (float phys)
+{
+    const auto r = knobRect (xs.front());
+    shown = nh::downscale (knob, roundToInt (r.getWidth() * phys), roundToInt (r.getHeight() * phys));
+    repaint();
 }
 
 void Slide::mouseDown (const MouseEvent& e)
@@ -248,7 +266,7 @@ void SpaceSonarEditor::rebuildCache()
     {
         Graphics g (img);
         g.setImageResamplingQuality (Graphics::highResamplingQuality);
-        g.drawImage (background, Rectangle<float> (0, 0, (float) w, (float) h));
+        g.drawImage (nh::downscale (background, w, h, Image::RGB), Rectangle<float> (0, 0, (float) w, (float) h));
         g.addTransform (AffineTransform::scale ((float) w / ssl::kW));
         int n = 0;
         const auto* t = ssl::texts (n);
@@ -271,6 +289,11 @@ void SpaceSonarEditor::rebuildCache()
     }
     cache = img;
     cacheScale = phys;
+    // petites pièces photo réduites proprement à leur taille d'affichage
+    const int led = roundToInt (16.25f * ssl::kFS * k() * phys);
+    ledOffS = nh::downscale (ledOff, led, led); ledOnS = nh::downscale (ledOn, led, led);
+    if (power != nullptr) power->rescale (phys);
+    for (auto* s : { slideEcho.get(), slideInput.get(), slideOut.get() }) if (s != nullptr) s->rescale (phys);
     repaint();
 }
 
@@ -397,14 +420,14 @@ void SpaceSonarEditor::paintFacadeLive (Graphics& g)
     {
         const float side = 16.25f;
         const auto r = Rectangle<float> (side, side).withCentre (c);
-        g.drawImage (ledOff, r);
+        g.drawImage (ledOffS.isValid() ? ledOffS : ledOff, r);
         if (level > 0.01f)
         {
             // halo (dosé par Glow), puis la lentille allumée (toujours à fond)
             ColourGradient h (col::red.withAlpha (0.42f * level * glow), c.x, c.y, col::red.withAlpha (0.0f), c.x + 26.0f, c.y, true);
             g.setGradientFill (h); g.fillEllipse (r.expanded (18));
             g.setOpacity (level);
-            g.drawImage (ledOn, r);
+            g.drawImage (ledOnS.isValid() ? ledOnS : ledOn, r);
             g.setOpacity (1.0f);
         }
     };

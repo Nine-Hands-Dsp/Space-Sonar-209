@@ -43,11 +43,12 @@ namespace ssui
         void paint (Graphics&) override;
         void mouseDown (const MouseEvent&) override;
         bool hitTest (int x, int y) override;
+        void rescale (float phys);                 // images réduites à la taille d'affichage (timer de l'éditeur)
     private:
         void timerCallback() override;
         SpaceSonarEditor& ed;
         RangedAudioParameter& param;
-        Image frames[3];
+        Image frames[3], shown[3];
         ParameterAttachment att;
         bool on = true; int mid = 0;
     };
@@ -63,13 +64,15 @@ namespace ssui
         void mouseDrag (const MouseEvent&) override;
         int position() const;
         void place();
+        void rescale (float phys);
         std::vector<float> xs, values;
         float y;
     private:
         SpaceSonarEditor& ed;
         RangedAudioParameter& param;
-        Image knob;
+        Image knob, shown;
         ParameterAttachment att;
+        Rectangle<float> knobRect (float x) const;
         float cur = 0.0f;
         void setPos (int i);
         int nearest (float unitX) const;
@@ -126,7 +129,7 @@ private:
     void paintLower (juce::Graphics&);
 
     // images
-    juce::Image background, ledOff, ledOn, cache;
+    juce::Image background, ledOff, ledOn, ledOffS, ledOnS, cache;
     float cacheScale = 0.0f;
     juce::Typeface::Ptr reg, med, bold, light;
     std::unique_ptr<juce::Drawable> logo;

@@ -11,6 +11,43 @@
 //==============================================================================
 namespace nh
 {
+// Réduction d'image sans crénelage : moyennes exactes 2 x 2 (filtre boîte) tant que l'image fait plus du double
+// de la cible, puis dernière étape lissée (<= 2x). Le rééchantillonnage de JUCE ne filtre pas les fortes réductions
+// (moletage et contours en escalier, aspect « basse résolution ») : toutes les pièces passent par ici.
+inline juce::Image halve (const juce::Image& src)
+{
+    const int w = juce::jmax (1, src.getWidth() / 2), h = juce::jmax (1, src.getHeight() / 2);
+    juce::Image out (src.getFormat(), w, h, false);
+    const juce::Image::BitmapData s (src, juce::Image::BitmapData::readOnly);
+    juce::Image::BitmapData d (out, juce::Image::BitmapData::writeOnly);
+    const int ps = s.pixelStride;
+    for (int y = 0; y < h; ++y)
+    {
+        const juce::uint8* r0 = s.getLinePointer (juce::jmin (2 * y, src.getHeight() - 1));
+        const juce::uint8* r1 = s.getLinePointer (juce::jmin (2 * y + 1, src.getHeight() - 1));
+        juce::uint8* o = d.getLinePointer (y);
+        for (int x = 0; x < w; ++x)
+        {
+            const int x0 = 2 * x * ps, x1 = juce::jmin (2 * x + 1, src.getWidth() - 1) * ps;
+            for (int c = 0; c < ps; ++c)
+                o[x * d.pixelStride + c] = (juce::uint8) ((r0[x0 + c] + r0[x1 + c] + r1[x0 + c] + r1[x1 + c] + 2) >> 2);
+        }
+    }
+    return out;
+}
+
+inline juce::Image downscale (juce::Image src, int w, int h, juce::Image::PixelFormat fmt = juce::Image::ARGB)
+{
+    if (src.isNull() || w <= 0 || h <= 0) return {};
+    if (src.getFormat() != fmt) src = src.convertedToFormat (fmt);
+    while (src.getWidth() >= 2 * w && src.getHeight() >= 2 * h) src = halve (src);
+    juce::Image out (fmt, w, h, true);
+    juce::Graphics g (out);
+    g.setImageResamplingQuality (juce::Graphics::highResamplingQuality);
+    g.drawImage (src, juce::Rectangle<float> (0.0f, 0.0f, (float) w, (float) h));
+    return out;
+}
+
 struct KnobStyle
 {
     float startAngle = juce::degreesToRadians (-135.0f);
@@ -177,12 +214,7 @@ private:
         if (px <= 0) return;
         auto fit = [px] (const juce::Image& src)
         {
-            if (src.isNull()) return juce::Image();
-            juce::Image out (juce::Image::ARGB, px, px, true);
-            juce::Graphics g (out);
-            g.setImageResamplingQuality (juce::Graphics::highResamplingQuality);
-            g.drawImage (src, juce::Rectangle<float> (0.0f, 0.0f, (float) px, (float) px), juce::RectanglePlacement::centred);
-            return out;
+            return downscale (src, px, px);                  // calques carrés : même cadrage
         };
         shadowCache = fit (layers.shadow);
         highlightCache = fit (layers.highlight);

@@ -168,11 +168,24 @@ int main (int argc, char** argv)
         return 0;
     }
 
+    //---------------------------------------------------------- taille par defaut (60 %) sur un ecran 1x, sans agrandissement
+    if (argc > 1 && String (argv[1]) == "small")
+    {
+        SpaceSonarProcessor p; p.setPlayConfigDetails (2, 2, fs, B); p.loadFactoryPreset (0); p.prepareToPlay (fs, B);
+        SpaceSonarEditor ed (p); ed.setSize (896, 784);
+        for (int i = 0; i < 12; ++i) ed.timerCallback();
+        for (int i = 0; i < 4; ++i) for (auto* c : ed.getChildren()) if (auto* kn = dynamic_cast<nh::Knob*> (c)) kn->forceTick();
+        ed.statusTime = -1.0e9; ed.statusAlpha = 0;
+        snap (ed, argc > 2 ? String (argv[2]) : String ("ss_60.png"), 1.0f);
+        return 0;
+    }
+
     //---------------------------------------------------------- controle de l'aiguille : une image par graduation
     if (argc > 1 && String (argv[1]) == "vucheck")
     {
         SpaceSonarProcessor p; p.setPlayConfigDetails (2, 2, fs, B); p.loadFactoryPreset (0); p.prepareToPlay (fs, B);
-        SpaceSonarEditor ed (p); ed.setSize (1600, 1400);
+        SpaceSonarEditor ed (p); ed.setSize (1600, 1400); ed.setTransform (AffineTransform::scale (3.0f));
+        for (int i = 0; i < 12; ++i) ed.timerCallback();
         auto Fx = [] (float x) { return 800.0f + (x - 800.0f) * 1.12f; };
         auto Fy = [] (float y) { return 780.0f + (y - 780.0f) * 1.12f; };
         const Rectangle<int> area = Rectangle<float>::leftTopRightBottom (Fx (236), Fy (384), Fx (456), Fy (504)).toNearestInt();
@@ -191,7 +204,8 @@ int main (int argc, char** argv)
     {
         SpaceSonarProcessor p; p.setPlayConfigDetails (2, 2, fs, B);
         p.loadFactoryPreset (0); p.prepareToPlay (fs, B);
-        SpaceSonarEditor ed (p); ed.setSize (1600, 1400);
+        SpaceSonarEditor ed (p); ed.setSize (1600, 1400); ed.setTransform (AffineTransform::scale (2.0f));
+        for (int i = 0; i < 12; ++i) ed.timerCallback();
         for (int i = 0; i < 4; ++i) for (auto* c : ed.getChildren()) if (auto* kn = dynamic_cast<nh::Knob*> (c)) kn->forceTick();
         ed.statusTime = -1.0e9; ed.statusAlpha = 0;
         auto Fx = [] (float x) { return 800.0f + (x - 800.0f) * 1.12f; };
@@ -225,6 +239,7 @@ int main (int argc, char** argv)
         if (tweak) tweak (p);
         p.prepareToPlay (fs, B);
         SpaceSonarEditor ed (p); ed.setSize (width, width * 1400 / 1600);
+        ed.setTransform (AffineTransform::scale (2.0f));    // ecran 2x simule : caches construits a la resolution de la capture
         TestGuitar gt (fs); AudioBuffer<float> buf (2, B);
         for (int k = 0; k < (int) (3.0 * fs / B); ++k)
         {
