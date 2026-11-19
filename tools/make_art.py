@@ -94,8 +94,27 @@ G2 = (196, 202, 198, 255)
 
 # ====================================================================== textes (dessines par l'editeur)
 TEXTS = []          # (x, y, texte, taille, graisse, argb, interlettrage, ancre)
-def T(x, y, s, size, weight='Medium', col=WHITE, track=0.0, anchor='mm'):
-    TEXTS.append((x, y, s, size, weight, col, track, anchor))
+def T(x, y, s, size, weight='Medium', col=WHITE, track=0.0, anchor='mm', rot=0.0):
+    TEXTS.append((x, y, s, size, weight, col, track, anchor, rot))
+
+
+_FONTS = {}
+def advance(ch, size, weight='Medium'):
+    if weight not in _FONTS:
+        _FONTS[weight] = ImageFont.truetype(os.path.join(ROOT, 'fonts', 'Poppins-%s.ttf' % weight), 400)
+    return _FONTS[weight].getlength(ch) * size / 400.0
+
+
+def arc_text(cx, cy, r, center_deg, text, size, weight='Medium', col=WHITE, track=0.0):
+    """texte courbe, sommets des lettres vers l'exterieur, lu dans le sens horaire (0 deg = en haut)"""
+    adv = [advance(c, size, weight) + track for c in text]
+    total = sum(adv) - track
+    a = math.radians(center_deg) - total / r / 2.0
+    for c, w_ in zip(text, adv):
+        mid = a + (w_ - track) / 2.0 / r
+        if c != ' ':
+            T(cx + r * math.sin(mid), cy - r * math.cos(mid), c, size, weight, col, 0.0, 'mm', math.degrees(mid))
+        a += w_ / r
 
 # ====================================================================== fond
 img = np.zeros((PH, PW, 3), np.float32)
@@ -181,16 +200,31 @@ T(200, 466, 'PEAK', 10, 'Medium', WHITE, 1.2); T(200, 479, 'LEVEL', 10, 'Medium'
 LK = [(190, 'MIC', 'VOLUME'), (345, 'FROM P.A.', 'VOLUME'), (500, 'INSTRUMENT', 'VOLUME')]
 for x, a1, a2 in LK:
     T(x, 540, a1, 11, 'Medium', WHITE, 1.1); T(x, 554, a2, 11, 'Medium', WHITE, 1.1)
-T(689, 404, 'MODE SELECTOR', 12.5, 'Medium', WHITE, 1.4)
-MX, MY, MR = 689, 528, 46
+T(689, 402, 'MODE SELECTOR', 12.5, 'Bold', WHITE, 1.6)
+MX, MY, MR = 689, 528, 44
 MANG = [-150 + 30 * i for i in range(11)] + [180]
+# bande de graduation blanche (1 a 11), separations noires, ouverte en bas sur REVERB ONLY
+RB0, RB1 = 53.0, 70.0
+dd = np.hypot(xx - U(MX), yy - U(MY))
+th = np.degrees(np.arctan2(xx - U(MX), -(yy - U(MY))))          # 0 = en haut, sens horaire
+band = np.clip(dd - U(RB0), 0, 1) * np.clip(U(RB1) - dd, 0, 1) * np.clip((165.0 - np.abs(th)) * U(RB1) * math.pi / 180.0, 0, 1)
+img = soft_shadow(img, band, 1.2, 1.2, 1.5, 0.45)
+shade = 226 + 16 * np.clip(1 - ((xx - U(MX - RB1)) + (yy - U(MY - RB1))) / U(4 * RB1), 0, 1)
+img = fill(img, band, shade[..., None] * np.array([1.0, 1.0, 0.975]))
 L, td = line_layer()
-for i in range(12):
-    a = math.radians(MANG[i] - 90)
-    td.line([U(MX + (MR + 7) * math.cos(a)), U(MY + (MR + 7) * math.sin(a)), U(MX + (MR + 14) * math.cos(a)), U(MY + (MR + 14) * math.sin(a))], fill=WHITE, width=int(U(1.8)))
-    if i < 11:
-        T(MX + (MR + 25) * math.cos(a), MY + (MR + 25) * math.sin(a), str(i + 1), 11.5, 'Medium', WHITE)
-T(MX, MY + 80, 'REVERB', 10, 'Medium', WHITE, 1.2); T(MX, MY + 93, 'ONLY', 10, 'Medium', WHITE, 1.2)
+for kk in range(12):
+    a = math.radians(-165 + 30 * kk)
+    td.line([U(MX + RB0 * math.sin(a)), U(MY - RB0 * math.cos(a)), U(MX + RB1 * math.sin(a)), U(MY - RB1 * math.cos(a))], fill=(18, 20, 18, 255), width=int(U(1.6)))
+a = math.radians(180)
+td.line([U(MX + (RB0 + 2) * math.sin(a)), U(MY - (RB0 + 2) * math.cos(a)), U(MX + (RB1 - 1) * math.sin(a)), U(MY - (RB1 - 1) * math.cos(a))], fill=WHITE, width=int(U(2.2)))
+img = comp(img, L)
+for i in range(11):
+    a = math.radians(MANG[i])
+    T(MX + 61.8 * math.sin(a), MY - 61.8 * math.cos(a), str(i + 1), 10.5, 'Bold', (16, 18, 16, 255), 0.0, 'mm', MANG[i])
+arc_text(MX, MY, 79.0, -105.0, 'REPEAT', 9.0, 'Medium', WHITE, 1.0)
+arc_text(MX, MY, 79.0, 72.0, 'REVERB ECHO', 9.0, 'Medium', WHITE, 1.0)
+T(MX, MY + 84, 'REVERB', 10, 'Medium', WHITE, 1.2); T(MX, MY + 97, 'ONLY', 10, 'Medium', WHITE, 1.2)
+L, td = line_layer()
 RK = [(882, 478, 'BASS'), (1020, 478, 'TREBLE'), (1158, 478, 'REVERB VOLUME'), (882, 612, 'REPEAT RATE'), (1020, 612, 'INTENSITY'), (1158, 612, 'ECHO VOLUME')]
 for x, y, lab in RK:
     T(x, y - 60, lab, 11, 'Medium', WHITE, 1.1)
@@ -326,6 +360,30 @@ mm = cv2.GaussianBlur(np.asarray(m, np.float32) / 255.0, (0, 0), 1.0)
 save_layer('knob_black_marker', np.full((N, N, 3), 236.0), mm)
 hl_rgb, hl_a = highlight_from(v, baseb, body)
 save_layer('knob_black_highlight', hl_rgb, hl_a)
+# --- selecteur de mode : chapeau chrome (r <= 0,70) sur jupe noire molete
+RC = 0.70
+mapx = (kc + (kx - kc) * (1.0 / RC)).astype(np.float32); mapy = (kc + (ky - kc) * (1.0 / RC)).astype(np.float32)
+chrome_in = cv2.remap(chrome.astype(np.float32), mapx, mapy, cv2.INTER_LINEAR)
+base_in = cv2.remap(base.astype(np.float32), mapx, mapy, cv2.INTER_LINEAR)
+capz = (kr <= RC).astype(np.float32)
+skirtz = ((kr > RC) & (kr <= 1.0)).astype(np.float32)
+knurl2 = 0.5 + 0.5 * np.sign(np.sin(kth * 72))
+skirt = baseb * (0.80 + 0.30 * knurl2)                       # moletage de la jupe noire
+target = np.where(kr <= RC, chrome_in, v)
+basem = np.where(kr <= RC, base_in, skirt)
+lip = np.clip(1 - np.abs(kr - RC) / 0.025, 0, 1)            # liseré sombre entre chapeau et jupe
+save_layer('knob_mode_crown', np.dstack([skirt * (1 - 0.6 * lip)] * 3), a * skirtz)
+save_layer('knob_mode_cap', np.dstack([base_in * (1 - 0.5 * lip)] * 3) * np.array([0.98, 0.99, 1.0]), a * capz)
+m = Image.new('L', (N, N), 0); dm = ImageDraw.Draw(m)
+dm.line([kc, kc - RPX * 0.06, kc, kc - RPX * 0.64], fill=255, width=int(RPX * 0.07))
+mk = cv2.GaussianBlur(np.asarray(m, np.float32) / 255.0, (0, 0), 1.0)
+m = Image.new('L', (N, N), 0); dm = ImageDraw.Draw(m)
+dm.line([kc, kc - RPX * 0.76, kc, kc - RPX * 0.97], fill=255, width=int(RPX * 0.075))
+mw = cv2.GaussianBlur(np.asarray(m, np.float32) / 255.0, (0, 0), 1.0)
+mrgb = np.dstack([18 * mk + 238 * mw] * 3) / np.maximum(np.dstack([mk + mw] * 3), 1e-4)
+save_layer('knob_mode_marker', mrgb, np.clip(mk + mw, 0, 1))
+hl_rgb, hl_a = highlight_from(np.where(kr <= RC, chrome_in, skirt * (v / np.maximum(baseb, 1))), basem, body)
+save_layer('knob_mode_highlight', hl_rgb, hl_a)
 print('potards ok')
 
 # ====================================================================== inverseur, LED, glissiere (4 px par unite)
@@ -362,11 +420,11 @@ def cstr(s):
 W_ = {'Regular': 0, 'Medium': 1, 'Bold': 2, 'Light': 3}
 lines = ['#pragma once', '// genere par tools/make_art.py : ne pas modifier a la main', '#include <cstdint>', '',
          'namespace ssl', '{', '    constexpr float kW = %d.0f, kH = %d.0f;   // repere de l\'interface (100 %%)' % (W, H),
-         '    struct Txt { float x, y; const char* s; float size; int weight; uint32_t argb; float track; bool left; };',
+         '    struct Txt { float x, y; const char* s; float size; int weight; uint32_t argb; float track; bool left; float rot; };',
          '    inline const Txt* texts (int& n)', '    {', '        static const Txt t[] = {']
-for (x, y, s, size, w, col, tr, anc) in TEXTS:
+for (x, y, s, size, w, col, tr, anc, rot) in TEXTS:
     argb = (col[3] << 24) | (col[0] << 16) | (col[1] << 8) | col[2]
-    lines.append('            { %.2ff, %.2ff, %s, %.2ff, %d, 0x%08xu, %.2ff, %s },' % (x, y, cstr(s), size, W_[w], argb, tr, 'true' if anc == 'lm' else 'false'))
+    lines.append('            { %.2ff, %.2ff, %s, %.2ff, %d, 0x%08xu, %.2ff, %s, %.2ff },' % (x, y, cstr(s), size, W_[w], argb, tr, 'true' if anc == 'lm' else 'false', rot))
 lines += ['        };', '        n = (int) (sizeof (t) / sizeof (t[0]));', '        return t;', '    }', '}', '']
 open(os.path.join(ROOT, 'Layout.h'), 'w').write('\n'.join(lines))
 print('Layout.h ok,', len(TEXTS), 'textes')

@@ -118,6 +118,11 @@ SpaceSonarEditor::SpaceSonarEditor (SpaceSonarProcessor& p)
                               png (BinaryData::knob_chrome_cap_png, BinaryData::knob_chrome_cap_pngSize), {},
                               png (BinaryData::knob_chrome_marker_png, BinaryData::knob_chrome_marker_pngSize),
                               png (BinaryData::knob_chrome_highlight_png, BinaryData::knob_chrome_highlight_pngSize) };
+    nh::Knob::Layers modeL { chrome.shadow,
+                             png (BinaryData::knob_mode_crown_png, BinaryData::knob_mode_crown_pngSize),
+                             png (BinaryData::knob_mode_cap_png, BinaryData::knob_mode_cap_pngSize), {},
+                             png (BinaryData::knob_mode_marker_png, BinaryData::knob_mode_marker_pngSize),
+                             png (BinaryData::knob_mode_highlight_png, BinaryData::knob_mode_highlight_pngSize) };
     nh::Knob::Layers black { png (BinaryData::knob_black_shadow_png, BinaryData::knob_black_shadow_pngSize), {},
                              png (BinaryData::knob_black_cap_png, BinaryData::knob_black_cap_pngSize), {},
                              png (BinaryData::knob_black_marker_png, BinaryData::knob_black_marker_pngSize),
@@ -125,7 +130,7 @@ SpaceSonarEditor::SpaceSonarEditor (SpaceSonarProcessor& p)
 
     knobPos = {
         { "micVol", 190, 619, 31, false }, { "paVol", 345, 619, 31, false }, { "instVol", 500, 619, 31, false },
-        { "mode", 689, 528, 46, false },
+        { "mode", 689, 528, 44, false },
         { "bass", 882, 478, 30, false }, { "treble", 1020, 478, 30, false }, { "reverbVol", 1158, 478, 30, false },
         { "repeatRate", 882, 612, 30, false }, { "intensity", 1020, 612, 30, false }, { "echoVol", 1158, 612, 30, false },
         { "speed", 1120, 1170, 24, true }, { "lfoRate", 1310, 1170, 24, true }, { "lfoShape", 1410, 1170, 24, true }, { "lfoDepth", 1510, 1170, 24, true },
@@ -141,7 +146,7 @@ SpaceSonarEditor::SpaceSonarEditor (SpaceSonarProcessor& p)
             st.dragPixels = 330.0f;
         }
         auto* prm = proc.apvts.getParameter (kp.id);
-        auto kn = std::make_unique<nh::Knob> (*prm, kp.black ? black : chrome, st);
+        auto kn = std::make_unique<nh::Knob> (*prm, kp.black ? black : String (kp.id) == "mode" ? modeL : chrome, st);
         const String id = kp.id;
         kn->onRightClick = [this, id] (const MouseEvent&) { showParamMenu (id); };
         addAndMakeVisible (*kn);
@@ -256,6 +261,8 @@ void SpaceSonarEditor::rebuildCache()
             const float wd = GlyphArrangement::getStringWidth (f, String::fromUTF8 (x.s)) + 4.0f;
             const auto r = x.left ? Rectangle<float> (x.x, x.y - x.size, wd, x.size * 2.0f)
                                   : Rectangle<float> (wd, x.size * 2.0f).withCentre ({ x.x, x.y });
+            Graphics::ScopedSaveState rs (g);
+            if (x.rot != 0.0f) g.addTransform (AffineTransform::rotation (degreesToRadians (x.rot), x.x, x.y));   // textes en arc (MODE SELECTOR)
             g.drawText (String::fromUTF8 (x.s), r, x.left ? Justification::centredLeft : Justification::centred, false);
         }
         if (logo != nullptr)
