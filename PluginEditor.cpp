@@ -374,21 +374,6 @@ void SpaceSonarEditor::paintHeader (Graphics& g)
 }
 
 // VU (photo fournie) : pivot de l'aiguille sous la vitre, angle d'après la graduation de la photo
-namespace vuGeo
-{
-    const Rectangle<float> face (250.6f, 397.4f, 190.8f, 92.8f);       // vitre (unités de façade)
-    const Point<float> pivot (349.1f, 580.4f);
-    constexpr float tipR = 164.0f;
-    // dB -> angle (degrés) mesurés sur la photo
-    inline float angleFor (float db)
-    {
-        static const float d[8] = { -20, -10, -7, -5, -3, -1, 0, 3 };
-        static const float a[8] = { -25.4f, -18.2f, -13.1f, -6.0f, 0.7f, 7.9f, 13.5f, 25.7f };
-        if (db <= d[0]) return a[0] - 2.0f * jlimit (0.0f, 1.0f, (d[0] - db) / 20.0f);
-        for (int i = 1; i < 8; ++i) if (db <= d[i]) return a[i - 1] + (a[i] - a[i - 1]) * (db - d[i - 1]) / (d[i] - d[i - 1]);
-        return jmin (29.0f, a[7] + (db - 3.0f) * 1.5f);
-    }
-}
 
 void SpaceSonarEditor::paintFacadeLive (Graphics& g)
 {

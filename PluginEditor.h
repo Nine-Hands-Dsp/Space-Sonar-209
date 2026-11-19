@@ -5,6 +5,24 @@
 #include "NineHandsWindow.h"
 #include "Layout.h"
 
+namespace vuGeo   // géométrie de l'aiguille du VU (unités de façade)
+{
+    inline const juce::Rectangle<float> face (250.6f, 397.4f, 190.8f, 92.8f);       // vitre (unités de façade)
+    // pivot = centre des arcs de l'échelle, ajusté sur la photo (cercles des blocs et de l'arc fin, écart < 1 px)
+    inline const juce::Point<float> pivot (346.8f, 573.3f);
+    constexpr float tipR = 154.0f;                                     // pointe juste au-dessus des blocs, sous les chiffres
+    // dB -> angle (degrés) mesurés sur la photo depuis ce pivot : séparations des blocs (-10 à -3),
+    // limite vert / rouge (0), centre du chiffre -1, début et fin de l'échelle (-20, +3)
+    inline float angleFor (float db)
+    {
+        static const float d[8] = { -20, -10, -7, -5, -3, -1, 0, 3 };
+        static const float a[8] = { -26.4f, -18.85f, -12.25f, -5.6f, 1.05f, 8.9f, 13.5f, 26.7f };
+        if (db <= d[0]) return a[0] - 2.0f * juce::jlimit (0.0f, 1.0f, (d[0] - db) / 20.0f);
+        for (int i = 1; i < 8; ++i) if (db <= d[i]) return a[i - 1] + (a[i] - a[i - 1]) * (db - d[i - 1]) / (d[i] - d[i - 1]);
+        return juce::jmin (29.0f, a[7] + (db - 3.0f) * 1.5f);
+    }
+}
+
 class SpaceSonarEditor;
 
 namespace ssui

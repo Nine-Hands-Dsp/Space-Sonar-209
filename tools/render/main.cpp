@@ -168,6 +168,55 @@ int main (int argc, char** argv)
         return 0;
     }
 
+    //---------------------------------------------------------- controle de l'aiguille : une image par graduation
+    if (argc > 1 && String (argv[1]) == "vucheck")
+    {
+        SpaceSonarProcessor p; p.setPlayConfigDetails (2, 2, fs, B); p.loadFactoryPreset (0); p.prepareToPlay (fs, B);
+        SpaceSonarEditor ed (p); ed.setSize (1600, 1400);
+        auto Fx = [] (float x) { return 800.0f + (x - 800.0f) * 1.12f; };
+        auto Fy = [] (float y) { return 780.0f + (y - 780.0f) * 1.12f; };
+        const Rectangle<int> area = Rectangle<float>::leftTopRightBottom (Fx (236), Fy (384), Fx (456), Fy (504)).toNearestInt();
+        const float dbs[8] = { -20, -10, -7, -5, -3, -1, 0, 3 };
+        for (int i = 0; i < 8; ++i)
+        {
+            ed.vuAngle = vuGeo::angleFor (dbs[i]); ed.repaint();
+            auto img = ed.createComponentSnapshot (area, true, 3.0f);
+            FileOutputStream os (File::getCurrentWorkingDirectory().getChildFile (String::formatted ("vuchk_%d.png", i))); PNGImageFormat png; png.writeImageToStream (img, os);
+        }
+        return 0;
+    }
+
+    //---------------------------------------------------------- GIF du VU-metre (images 30 i/s)
+    if (argc > 1 && String (argv[1]) == "vugif")
+    {
+        SpaceSonarProcessor p; p.setPlayConfigDetails (2, 2, fs, B);
+        p.loadFactoryPreset (0); p.prepareToPlay (fs, B);
+        SpaceSonarEditor ed (p); ed.setSize (1600, 1400);
+        for (int i = 0; i < 4; ++i) for (auto* c : ed.getChildren()) if (auto* kn = dynamic_cast<nh::Knob*> (c)) kn->forceTick();
+        ed.statusTime = -1.0e9; ed.statusAlpha = 0;
+        auto Fx = [] (float x) { return 800.0f + (x - 800.0f) * 1.12f; };
+        auto Fy = [] (float y) { return 780.0f + (y - 780.0f) * 1.12f; };
+        const Rectangle<int> area = Rectangle<float>::leftTopRightBottom (Fx (160), Fy (378), Fx (466), Fy (512)).toNearestInt();
+        TestGuitar gt (fs); AudioBuffer<float> buf (2, 160);
+        File dir = File::getCurrentWorkingDirectory().getChildFile ("vu_frames"); dir.deleteRecursively(); dir.createDirectory();
+        const int N = 300;                                    // 10 s
+        for (int f = 0; f < N; ++f)
+        {
+            if (f == 250) setP (p, "power", 0.0f);            // extinction a la fin : l'aiguille retombe
+            const float gain = f < 120 ? 0.6f : (f < 160 ? 1.6f : (f < 200 ? 3.5f : 0.6f));   // passage fort -> pic rouge
+            for (int b = 0; b < 10; ++b)                      // 1600 echantillons = 1/30 s
+            {
+                for (int i = 0; i < 160; ++i) { const float v = gt.next1() * gain; buf.setSample (0, i, v); buf.setSample (1, i, v); }
+                p.processBlock (buf, midi);
+            }
+            ed.timerCallback();
+            auto img = ed.createComponentSnapshot (area, true, 2.0f);
+            FileOutputStream os (dir.getChildFile (String::formatted ("f%04d.png", f))); PNGImageFormat png; png.writeImageToStream (img, os);
+        }
+        std::cout << "ecrit " << N << " images\n";
+        return 0;
+    }
+
     //---------------------------------------------------------- captures
     auto shot = [&] (int preset, const String& name, std::function<void (SpaceSonarProcessor&)> tweak, int width)
     {
