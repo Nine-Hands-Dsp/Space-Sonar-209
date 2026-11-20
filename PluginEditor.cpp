@@ -1,4 +1,5 @@
 #include "PluginEditor.h"
+#include "NineHandsStatusText.h"
 #include "BinaryData.h"
 
 using namespace juce;
@@ -342,7 +343,7 @@ void SpaceSonarEditor::paintHeader (Graphics& g)
     {
         g.setFont (font (1, 21));
         g.setColour (col::text.withAlpha (statusAlpha));
-        g.drawFittedText (status, p.reduced (19, 0).toNearestInt(), Justification::centred, 1, 0.6f);
+        nhstatus::draw (g, status, p.reduced (19, 0), Justification::centred);   // chiffres à chasse fixe
     }
 
     // vumètres IN / OUT
@@ -1001,8 +1002,8 @@ void SpaceSonarEditor::timerCallback()
 
     // ligne d'état : ~2,5 s après le dernier mouvement, puis fondu vers la barre de presets
     const float target = (t - statusTime < 2500.0) ? 1.0f : 0.0f;
-    const float na = target > statusAlpha ? jmin (1.0f, statusAlpha + 0.28f) : jmax (0.0f, statusAlpha - 0.11f);
-    if (std::abs (na - statusAlpha) > 0.001f) { statusAlpha = na; askRepaint ({ 14, 22, 412, 52 }); }
+    const float na = target > statusAlpha ? jmin (target, statusAlpha + 0.28f) : jmax (target, statusAlpha - 0.11f);   // immobile une fois arrivé (sinon 100 / 89 % à chaque image = scintillement)
+    if (std::abs (na - statusAlpha) > 0.001f || (na > 0.0f && status != lastStatusDrawn)) { statusAlpha = na; lastStatusDrawn = status; askRepaint ({ 14, 22, 412, 52 }); }
 
     // VU (aiguille), LED, vumètres
     const bool on = proc.prm.power->load() > 0.5f;

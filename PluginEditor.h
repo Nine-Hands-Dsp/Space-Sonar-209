@@ -149,6 +149,7 @@ private:
 
     // état affiché
     juce::String status;
+    juce::String lastStatusDrawn;      // texte affiché au dernier dessin (redessin quand il change)
     double statusTime = -10.0;
     float statusAlpha = 0.0f;
     float glow = 1.0f;
